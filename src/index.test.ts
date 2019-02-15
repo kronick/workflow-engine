@@ -1,7 +1,7 @@
 import { promisify } from "util";
-import { exec as exec_cb } from "child_process";
+import { exec as _exec } from "child_process";
 
-const exec = promisify(exec_cb);
+const exec = promisify(_exec);
 
 describe("CLI end-to-end test", () => {
   it("echoes command line argument", async () => {
