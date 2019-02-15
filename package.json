@@ -1,5 +1,5 @@
 {
-  "name": "spreadsheet",
+  "name": "typescript-node-starter",
   "version": "0.1.0",
   "description": "",
   "main": "index.js",
@@ -12,8 +12,8 @@
     "test:live": "yarn jest --watchAll"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Sam Kronick <sam.kronick@gmail.com>",
+  "license": "MIT",
   "dependencies": {
     "@types/jest": "24.0.4",
     "@types/node": "11.9.3",
