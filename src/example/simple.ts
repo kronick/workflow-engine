@@ -8,13 +8,15 @@ export const simpleDefinition: SystemDefinition = {
   resources: {
     Document: {
       states: [
+        "archived",
         "authoring",
         "reviewing",
-        "archived",
         "approved",
         "revising",
         "published"
       ],
+
+      defaultState: "authoring",
 
       properties: {
         title: {

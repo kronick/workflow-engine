@@ -3,6 +3,7 @@ import faker from "faker";
 
 interface UnknownResource {
   [property: string]: unknown;
+  state: string;
 }
 
 export interface DataLoader {
@@ -10,7 +11,7 @@ export interface DataLoader {
     type: string,
     data: Object
   ): Promise<{ uid: string; type: string; data: Object }>;
-  read(uid: string, type: string): Promise<Object | undefined>;
+  read(uid: string, type: string): Promise<UnknownResource | undefined>;
   update(uid: string, type: string, data: Object): Promise<boolean>;
   delete(uid: string, type: string, data: Object): Promise<boolean>;
 
@@ -27,7 +28,7 @@ export class InMemoryDataLoader implements DataLoader {
     this.definition = definition;
   }
 
-  create(type: string, data: Object) {
+  create(type: string, data: { state: string }) {
     // TODO: Fail if `data` doesn't match the shape of the
     //       object definition.
     const uid = String(++this.last_uid);
@@ -50,7 +51,7 @@ export class InMemoryDataLoader implements DataLoader {
     // TODO: Fail if `data` doesn't match the shape of the
     //       object definition.
     this.data.set(InMemoryDataLoader.makeKey(uid, type), {
-      ...this.data.get(InMemoryDataLoader.makeKey(uid, type)),
+      ...this.data.get(InMemoryDataLoader.makeKey(uid, type))!,
       ...data
     });
 
@@ -109,7 +110,10 @@ export class FakeInMemoryDataLoader extends InMemoryDataLoader {
   }
 
   static generateFakeData(resource: ResourceDefinition) {
-    const out: UnknownResource = {};
+    const out: UnknownResource = {
+      state:
+        resource.defaultState || (resource.states ? resource.states[0] : "")
+    };
     for (const propertyName in resource.properties) {
       const def = resource.properties[propertyName];
       let value = null;

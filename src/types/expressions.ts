@@ -7,12 +7,39 @@ export type ExpressionResultTypes =
   | "string[]"
   | "number[]"
   | "boolean[]";
-export type Expression = GetExpression | SumExpression | string;
+
+export type ExpressionResult =
+  | string
+  | number
+  | boolean
+  | Date
+  | Array<string | boolean | number | Date>;
+
+export type Expression<T extends ExpressionResultTypes = "string"> =
+  | NumberProducingExpression
+  | BooleanProducingExpression
+  | StringProducingExpression
+  | ArrayProducingExpression<T>
+  | ResourceProducingExpression
+  | IfExpression
+  | Date
+  | Array<string | boolean | number | Date>;
+
+export type OperatorExpression = {
+  [operator: string]: { [key: string]: any } | any[];
+};
 
 export type NumberProducingExpression =
   | number
   | SumExpression
-  | GetExpression<"number">;
+  | AdditionExpression
+  | SubtractionExpression
+  | MultiplicationExpression
+  | DivisionExpression
+  | ModuloExpression
+  | PowerExpression
+  | GetExpression<"number">
+  | IfExpression;
 
 export type BooleanProducingExpression =
   | boolean
@@ -29,7 +56,8 @@ export type BooleanProducingExpression =
   | NotExpression
   | GreaterThanExpression
   | LessThanExpression
-  | EqualExpression;
+  | EqualExpression
+  | IfExpression;
 
 export type StringProducingExpression = GetExpression<"string"> | string;
 
@@ -108,7 +136,7 @@ interface DoesNotExistExpression {
 /** An expression that returns `true` if the specified resource is in one of
  *  the specified `states`.
  */
-interface InStateExpression {
+export interface InStateExpression {
   inState: {
     resource?: ResourceProducingExpression;
     states: ArrayProducingExpression<"string">;
@@ -125,35 +153,62 @@ interface CanTransitionExpression {
   };
 }
 
-interface AndExpression {
+export interface AndExpression {
   and: [BooleanProducingExpression, BooleanProducingExpression];
 }
-interface OrExpression {
+export interface OrExpression {
   or: [BooleanProducingExpression, BooleanProducingExpression];
 }
-interface NotExpression {
+export interface NotExpression {
   not: BooleanProducingExpression;
 }
-/** Behaves the same as `all` for now */
-interface AllExpression {
+
+export interface AllExpression {
   all: Array<BooleanProducingExpression>;
 }
-/** Behaves the same as `or` for now */
-interface AnyExpression {
+
+export interface AnyExpression {
   any: Array<BooleanProducingExpression>;
 }
-interface NoneExpression {
+export interface NoneExpression {
   none: Array<BooleanProducingExpression>;
 }
 
 // Mathematical Expression definitions
 ///////////////////////////////////////////////////////////////////////////////
-interface GreaterThanExpression {
+export interface GreaterThanExpression {
   ">": [NumberProducingExpression, NumberProducingExpression];
 }
-interface LessThanExpression {
+export interface LessThanExpression {
   "<": [NumberProducingExpression, NumberProducingExpression];
 }
-interface EqualExpression {
+export interface EqualExpression {
   "=": Array<NumberProducingExpression>;
+}
+
+export interface AdditionExpression {
+  "+": [NumberProducingExpression, NumberProducingExpression];
+}
+export interface SubtractionExpression {
+  "-": [NumberProducingExpression, NumberProducingExpression];
+}
+export interface DivisionExpression {
+  "/": [NumberProducingExpression, NumberProducingExpression];
+}
+export interface MultiplicationExpression {
+  "*": [NumberProducingExpression, NumberProducingExpression];
+}
+export interface ModuloExpression {
+  "%": [NumberProducingExpression, NumberProducingExpression];
+}
+export interface PowerExpression {
+  pow: [NumberProducingExpression, NumberProducingExpression];
+}
+
+// Special forms
+///////////////////////////////////////////////////////////////////////////////
+export interface IfExpression {
+  if: Expression;
+  then: Expression;
+  else: Expression;
 }
