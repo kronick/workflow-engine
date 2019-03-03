@@ -13,7 +13,9 @@ export type ExpressionResult =
   | number
   | boolean
   | Date
-  | Array<string | boolean | number | Date>;
+  | Array<string | boolean | number | Date>
+  | null
+  | undefined;
 
 export type Expression<T extends ExpressionResultTypes = "string"> =
   | NumberProducingExpression
@@ -23,7 +25,8 @@ export type Expression<T extends ExpressionResultTypes = "string"> =
   | ResourceProducingExpression
   | IfExpression
   | Date
-  | Array<string | boolean | number | Date>;
+  | Array<string | boolean | number | Date>
+  | ArgExpression;
 
 export type OperatorExpression = {
   [operator: string]: { [key: string]: any } | any[];
@@ -39,7 +42,8 @@ export type NumberProducingExpression =
   | ModuloExpression
   | PowerExpression
   | GetExpression<"number">
-  | IfExpression;
+  | IfExpression
+  | ArgExpression;
 
 export type BooleanProducingExpression =
   | boolean
@@ -57,9 +61,16 @@ export type BooleanProducingExpression =
   | GreaterThanExpression
   | LessThanExpression
   | EqualExpression
-  | IfExpression;
+  | StringEqualityExpression
+  | IfExpression
+  | GetExpression
+  | ArgExpression;
 
-export type StringProducingExpression = GetExpression<"string"> | string;
+export type StringProducingExpression =
+  | GetExpression
+  | IfExpression
+  | string
+  | ArgExpression;
 
 /** An expression that produces an array of primitives */
 export type ArrayProducingExpression<
@@ -78,12 +89,14 @@ export type ResourceProducingExpression =
 
 /** An expression that extracts a value from a single resource object */
 interface GetExpression<TResult extends ExpressionResultTypes = "string"> {
-  get: {
-    property: StringProducingExpression;
-    /** If `from` is not specified, the current resource is used */
-    from?: ResourceProducingExpression;
-    asType: TResult;
-  };
+  get:
+    | {
+        property: StringProducingExpression;
+        /** If `from` is not specified, the current resource is used */
+        from?: ResourceProducingExpression;
+        asType?: TResult;
+      }
+    | string;
 }
 
 /** An expression that extracts a value from a resource object */
@@ -93,6 +106,13 @@ interface GetAllExpression<TResult extends ExpressionResultTypes = "string[]"> {
     from: string | ResourceProducingExpression;
     asType: TResult;
   };
+}
+
+// Defined functions
+
+/** Read an expression from a custom function's arguments */
+interface ArgExpression {
+  $: string | number;
 }
 
 /** An expression that returns a resource referenced by the current resouce */
@@ -174,35 +194,39 @@ export interface NoneExpression {
   none: Array<BooleanProducingExpression>;
 }
 
+export interface StringEqualityExpression {
+  eq: [StringProducingExpression, StringProducingExpression];
+}
+
 // Mathematical Expression definitions
 ///////////////////////////////////////////////////////////////////////////////
 export interface GreaterThanExpression {
-  ">": [NumberProducingExpression, NumberProducingExpression];
+  ">": NumberProducingExpression[];
 }
 export interface LessThanExpression {
-  "<": [NumberProducingExpression, NumberProducingExpression];
+  "<": NumberProducingExpression[];
 }
 export interface EqualExpression {
-  "=": Array<NumberProducingExpression>;
+  "=": NumberProducingExpression[];
 }
 
 export interface AdditionExpression {
-  "+": [NumberProducingExpression, NumberProducingExpression];
+  "+": NumberProducingExpression[];
 }
 export interface SubtractionExpression {
-  "-": [NumberProducingExpression, NumberProducingExpression];
+  "-": NumberProducingExpression[];
 }
 export interface DivisionExpression {
-  "/": [NumberProducingExpression, NumberProducingExpression];
+  "/": NumberProducingExpression[];
 }
 export interface MultiplicationExpression {
-  "*": [NumberProducingExpression, NumberProducingExpression];
+  "*": NumberProducingExpression[];
 }
 export interface ModuloExpression {
-  "%": [NumberProducingExpression, NumberProducingExpression];
+  "%": NumberProducingExpression[];
 }
 export interface PowerExpression {
-  pow: [NumberProducingExpression, NumberProducingExpression];
+  pow: NumberProducingExpression[];
 }
 
 // Special forms

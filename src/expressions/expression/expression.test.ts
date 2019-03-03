@@ -1,85 +1,87 @@
-import evaluateExpression from "./";
+import evaluate from "./";
 import { InMemoryDataLoader } from "../../dataLoader/";
 import { Expression } from "../../types/expressions";
-
-const nullContext = { currentResource: null };
 
 describe("Expression evaluator", () => {
   describe("Primitive types", () => {
     it("passes through trivial types", () => {
-      expect(evaluateExpression(1)).toEqual(1);
-      expect(evaluateExpression(0)).toEqual(0);
-      expect(evaluateExpression(true)).toEqual(true);
-      expect(evaluateExpression(false)).toEqual(false);
-      expect(evaluateExpression("zing")).toEqual("zing");
-      expect(evaluateExpression([1, 2, 3])).toEqual([1, 2, 3]);
-      expect(evaluateExpression([1])).toEqual([1]);
+      expect(evaluate(1)).toEqual(1);
+      expect(evaluate(0)).toEqual(0);
+      expect(evaluate(true)).toEqual(true);
+      expect(evaluate(false)).toEqual(false);
+      expect(evaluate("zing")).toEqual("zing");
+      expect(evaluate([1, 2, 3])).toEqual([1, 2, 3]);
+      expect(evaluate([1])).toEqual([1]);
 
       const d = new Date();
-      expect(evaluateExpression(d)).toEqual(d);
-      expect(evaluateExpression([d, d, d])).toEqual([d, d, d]);
+      expect(evaluate(d)).toEqual(d);
+      expect(evaluate([d, d, d])).toEqual([d, d, d]);
     });
   });
 
   describe("Syntax errors", () => {
     it("throws errors for invalid objects", () => {
-      expect(() => evaluateExpression({} as any)).toThrow();
-      expect(() => evaluateExpression({ foo: "", bar: "" } as any)).toThrow();
+      expect(() => evaluate({} as any)).toThrow();
+      expect(() => evaluate({ foo: "", bar: "" } as any)).toThrow();
 
-      expect(() => evaluateExpression({ if: true } as any)).toThrow();
+      expect(() => evaluate({ if: true } as any)).toThrow();
 
-      expect(() => evaluateExpression({ if: true, then: "" } as any)).toThrow();
+      expect(() => evaluate({ if: true, then: "" } as any)).toThrow();
       expect(() =>
-        evaluateExpression({ if: true, then: "", else: "", bogus: true } as any)
+        evaluate({ if: true, then: "", else: "", bogus: true } as any)
       ).toThrow();
     });
   });
 
   describe("Type errors", () => {
     it("throws error for non-numerical values", () => {
-      expect(() => evaluateExpression({ "+": [5, "a" as any] })).toThrowError();
+      expect(() => evaluate({ "+": [5, "a" as any] })).toThrowError();
       expect(() =>
-        evaluateExpression({
+        evaluate({
           "+": [5, { "*": [1, { "+": [true as any, 1] }] }]
         })
       ).toThrow();
       expect(() =>
-        evaluateExpression({ "+": [{ if: false, then: 4, else: false }, 1] })
+        evaluate({ "+": [{ if: false, then: 4, else: false }, 1] })
       ).toThrow();
     });
 
     it("throws error for non-boolean values", () => {
-      expect(() => evaluateExpression({ if: 1, then: 2, else: 3 })).toThrow();
-      expect(() => evaluateExpression({ not: 1 as any })).toThrow();
-      expect(() => evaluateExpression({ or: [false, 1 as any] })).toThrow();
+      expect(() => evaluate({ if: 1, then: 2, else: 3 })).toThrow();
+      expect(() => evaluate({ not: 1 as any })).toThrow();
+      expect(() => evaluate({ or: [false, 1 as any] })).toThrow();
+    });
+
+    it("throws error for non-string values", () => {
+      expect(() => evaluate({ eq: [1 as any, ""] })).toThrow();
     });
   });
 
   describe("Operators", () => {
-    it("Evaluates mathematical operators", () => {
-      expect(evaluateExpression({ "+": [1, 2] })).toEqual(3);
-      expect(evaluateExpression({ "-": [1, 2] })).toEqual(-1);
-      expect(evaluateExpression({ "*": [4, 2] })).toEqual(8);
-      expect(evaluateExpression({ "/": [4, 2] })).toEqual(2);
-      expect(evaluateExpression({ "%": [9, 4] })).toEqual(1);
-      expect(evaluateExpression({ pow: [2, 3] })).toEqual(8);
-      expect(evaluateExpression({ "=": [2, 3] })).toEqual(false);
-      expect(evaluateExpression({ "=": [2, 2] })).toEqual(true);
-      expect(evaluateExpression({ "<": [2, 2] })).toEqual(false);
-      expect(evaluateExpression({ "<": [2, 200] })).toEqual(true);
-      expect(evaluateExpression({ ">": [1, 2] })).toEqual(false);
-      expect(evaluateExpression({ ">": [0, -200] })).toEqual(true);
+    it("evaluates mathematical operators", () => {
+      expect(evaluate({ "+": [1, 2] })).toEqual(3);
+      expect(evaluate({ "-": [1, 2] })).toEqual(-1);
+      expect(evaluate({ "*": [4, 2] })).toEqual(8);
+      expect(evaluate({ "/": [4, 2] })).toEqual(2);
+      expect(evaluate({ "%": [9, 4] })).toEqual(1);
+      expect(evaluate({ pow: [2, 3] })).toEqual(8);
+      expect(evaluate({ "=": [2, 3] })).toEqual(false);
+      expect(evaluate({ "=": [2, 2] })).toEqual(true);
+      expect(evaluate({ "<": [2, 2] })).toEqual(false);
+      expect(evaluate({ "<": [2, 200] })).toEqual(true);
+      expect(evaluate({ ">": [1, 2] })).toEqual(false);
+      expect(evaluate({ ">": [0, -200] })).toEqual(true);
     });
 
-    it("Evaluates compound mathematical expressions", () => {
+    it("evaluates compound mathematical expressions", () => {
       expect(
-        evaluateExpression({
+        evaluate({
           "+": [{ "*": [2, 10] }, { pow: [2, 3] }]
         })
       ).toEqual(28);
 
       expect(
-        evaluateExpression({
+        evaluate({
           if: { "=": [6, 2] },
           then: 10,
           else: 20
@@ -87,30 +89,35 @@ describe("Expression evaluator", () => {
       ).toEqual(20);
     });
 
+    it("evaluates string equality operator", () => {
+      expect(evaluate({ eq: ["foo", "bar"] })).toBe(false);
+      expect(evaluate({ eq: ["bling", "bling"] })).toBe(true);
+    });
+
     it("evaluates boolean expressions", () => {
-      expect(evaluateExpression({ or: [false, false] })).toBe(false);
-      expect(evaluateExpression({ or: [false, true] })).toBe(true);
-      expect(evaluateExpression({ or: [true, false] })).toBe(true);
-      expect(evaluateExpression({ or: [true, true] })).toBe(true);
+      expect(evaluate({ or: [false, false] })).toBe(false);
+      expect(evaluate({ or: [false, true] })).toBe(true);
+      expect(evaluate({ or: [true, false] })).toBe(true);
+      expect(evaluate({ or: [true, true] })).toBe(true);
 
-      expect(evaluateExpression({ and: [false, false] })).toBe(false);
-      expect(evaluateExpression({ and: [false, true] })).toBe(false);
-      expect(evaluateExpression({ and: [true, false] })).toBe(false);
-      expect(evaluateExpression({ and: [true, true] })).toBe(true);
+      expect(evaluate({ and: [false, false] })).toBe(false);
+      expect(evaluate({ and: [false, true] })).toBe(false);
+      expect(evaluate({ and: [true, false] })).toBe(false);
+      expect(evaluate({ and: [true, true] })).toBe(true);
 
-      expect(evaluateExpression({ not: false })).toBe(true);
-      expect(evaluateExpression({ not: true })).toBe(false);
+      expect(evaluate({ not: false })).toBe(true);
+      expect(evaluate({ not: true })).toBe(false);
 
-      expect(
-        evaluateExpression({ or: [{ not: true }, { and: [true, true] }] })
-      ).toBe(true);
+      expect(evaluate({ or: [{ not: true }, { and: [true, true] }] })).toBe(
+        true
+      );
     });
 
     it("short circuits on boolean 'or'", () => {
       // The second parameter to this `or` expression should throw an exception
       // if it gets evaluated, but if the `or` expression short-circuits it
       // will never get evaluated.
-      expect(() => evaluateExpression({ or: [true, 1 as any] })).not.toThrow();
+      expect(() => evaluate({ or: [true, 1 as any] })).not.toThrow();
     });
   });
 
@@ -122,8 +129,8 @@ describe("Expression evaluator", () => {
         then: "Yes",
         else: "No"
       };
-      expect(evaluateExpression(trueExpression)).toEqual("Yes");
-      expect(evaluateExpression(falseExpression)).toEqual("No");
+      expect(evaluate(trueExpression)).toEqual("Yes");
+      expect(evaluate(falseExpression)).toEqual("No");
     });
 
     it("evaluates nested if/then/else expressions", () => {
@@ -151,23 +158,143 @@ describe("Expression evaluator", () => {
         }
       };
 
-      expect(evaluateExpression(nested)).toEqual("Lose");
-      expect(evaluateExpression(nested2)).toEqual("ON");
+      expect(evaluate(nested)).toEqual("Lose");
+      expect(evaluate(nested2)).toEqual("ON");
     });
   });
 
-  describe.skip("References", () => {
-    it("Extracts properties from current object in context", () => {});
+  describe("Property access", () => {
+    it("extracts properties from current object in context", () => {
+      const ctx = { self: { species: "horse" } };
+      expect(evaluate({ get: { property: "species" } }, ctx)).toEqual("horse");
+    });
+    it("extracts property using shorthand syntax", () => {
+      const ctx = { self: { species: "horse" } };
+      expect(evaluate({ get: "species" }, ctx)).toEqual("horse");
+    });
+
+    // TODO: Is this the desired behavior or should we throw an error instead?
+    it("returns undefined if value does not exist", () => {
+      const ctx = { self: { species: "horse" } };
+      expect(evaluate({ get: "color" }, ctx)).toEqual(undefined);
+    });
+
+    it("can use expression to define which property to get", () => {
+      const ctx1 = { self: { species: "horse", speed: 100 } };
+      const ctx2 = { self: { species: "hare", weight: 5 } };
+
+      const exp: Expression = {
+        get: {
+          property: {
+            if: {
+              eq: ["horse", { get: "species" }]
+            },
+            then: "speed",
+            else: "weight"
+          },
+
+          asType: "string"
+        }
+      };
+
+      expect(evaluate(exp, ctx1)).toEqual(100);
+      expect(evaluate(exp, ctx2)).toEqual(5);
+    });
   });
 
-  // describe("Stack trace", () => {
-  //   it("generates useful stack representations", () => {
-  //     expect(stackRepresentation({ and: [true, true] })).toBe("and(true,true)");
-  //     expect(
-  //       stackRepresentation({
-  //         and: [{ if: true, then: true, else: false }, true],
-  //       })
-  //     ).toBe("and(#,true)");
-  //   });
-  // });
+  describe("Defined functions", () => {
+    it("evaluates a trivial function ", () => {
+      const ctx = {
+        definitions: {
+          PI: 3.14159
+        }
+      };
+      expect(evaluate({ PI: {} } as any, ctx)).toBe(3.14159);
+    });
+
+    it("evaluates a trivial function with no arguments", () => {
+      const ctx = {
+        definitions: {
+          three: { "+": [1, 2] }
+        }
+      };
+      expect(evaluate({ three: {} } as any, ctx)).toBe(3);
+    });
+
+    it("evaluates a defined function with array of arguments", () => {
+      const ctx = {
+        definitions: {
+          add: { "+": [{ $: 0 }, { $: 1 }] }
+        }
+      };
+      expect(evaluate({ add: [2, 3] } as any, ctx)).toBe(5);
+    });
+
+    it("evaluates a defined function with named arguments", () => {
+      const ctx = {
+        definitions: {
+          add: { "+": [{ $: "A" }, { $: "B" }] }
+        }
+      };
+      expect(evaluate({ add: { A: 2, B: 3 } } as any, ctx)).toBe(5);
+    });
+
+    it("evaluates nested defined functions with non-overlapping named arguments", () => {
+      const ctx = {
+        definitions: {
+          add: { "+": [{ $: "A" }, { $: "B" }] },
+          subtract: { "-": [{ $: "X" }, { $: "Y" }] }
+        }
+      };
+      expect(
+        evaluate(
+          { add: { A: { subtract: { X: 10, Y: 8 } }, B: 3 } } as any,
+          ctx
+        )
+      ).toBe(5);
+    });
+    it("evaluates nested defined functions with overlapping named arguments", () => {
+      const ctx = {
+        definitions: {
+          add: { "+": [{ $: "A" }, { $: "B" }] },
+          subtract: { "-": [{ $: "A" }, { $: "B" }] }
+        }
+      };
+      expect(
+        evaluate(
+          { add: { A: { subtract: { A: 10, B: 8 } }, B: 3 } } as any,
+          ctx
+        )
+      ).toBe(5);
+    });
+
+    it("throws an error when trying to access missing argument", () => {
+      const ctx = {
+        definitions: {
+          add: { "+": [{ $: "A" }, { $: "B" }] }
+        }
+      };
+      expect(() => evaluate({ add: { A: 2 } } as any, ctx)).toThrow();
+    });
+
+    it("throws an error when argument is of wrong type", () => {
+      const ctx = {
+        definitions: {
+          add: { "+": [{ $: "A" }, { $: "B" }] }
+        }
+      };
+      expect(() => evaluate({ add: { A: 2, B: "4" } } as any, ctx)).toThrow();
+    });
+  });
 });
+
+// describe("Stack trace", () => {
+//   it("generates useful stack representations", () => {
+//     expect(stackRepresentation({ and: [true, true] })).toBe("and(true,true)");
+//     expect(
+//       stackRepresentation({
+//         and: [{ if: true, then: true, else: false }, true],
+//       })
+//     ).toBe("and(#,true)");
+//   });
+// });
