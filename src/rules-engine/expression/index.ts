@@ -5,7 +5,7 @@ import { IfExpression, ExpressionResult } from "../../types/expressions";
 import { definition } from "../../example/change-management";
 import { isContext } from "vm";
 
-interface ExpressionContext {
+export interface ExpressionContext {
   // dataLoader: DataLoader;
   // definition: SystemDefinition;
 

@@ -111,16 +111,18 @@ export type PermissionDefinition = Array<
  *  overall condition will be evaluated to `allow`. If the `true` condition
  *  is a `DenyCondition`, the overall condition will be evaluated to `deny`.
  *
- *  If all conditions return `false` or the array is empty, the overall
- *  condition will be evaluated to `allow`.
+ *  If all conditions return `false`, the overall condition will be evaluated
+ *  to the opposite of the final condition type in the conditions array.
+ *
+ *  If the array is empty, the overall condition will evaluate to `allow`.
  */
-export type ConditionDefinition = Array<
+export type ConditionDefinition = Array<SingleConditionDefinition>;
+
+export type SingleConditionDefinition =
   | AllowConditionDefinition
   | DenyConditionDefinition
   | DenyAlwaysDefiniton
-  | AllowAlwaysDefiniton
->;
-
+  | AllowAlwaysDefiniton;
 export interface AllowConditionDefinition {
   allowIf: BooleanProducingExpression;
   denyMessage?: string;
@@ -131,5 +133,9 @@ export interface DenyConditionDefinition {
   denyMessage?: string;
 }
 
-export type DenyAlwaysDefiniton = "deny" | { denyWithMessage: string };
+export interface DenyWithMessageDefinition {
+  denyWithMessage: string;
+}
+
+export type DenyAlwaysDefiniton = "deny" | DenyWithMessageDefinition;
 export type AllowAlwaysDefiniton = "allow";
