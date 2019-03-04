@@ -1,5 +1,9 @@
 import { SystemDefinition, User } from "../types/";
 import { DataLoader } from "../dataLoader";
+import evaluateConditions from "../rules-engine/conditions";
+import evaluatePermissions from "../rules-engine/permissions";
+import { ConditionResult } from "../rules-engine/conditions/index";
+import { TransitionDefinition } from "../types/resources";
 
 export interface RawUnknownResource {
   [property: string]: unknown;
@@ -57,11 +61,16 @@ export type DescribeTransitionsResult = Array<{
   /** Target state */
   to: string;
 
-  /** Whether or not this transition is possible for anyone */
+  /** Whether or not this transition is possible given its current state*/
   possible: boolean;
 
   /** Whether or not this transition is allowed for the requesting user */
   allowed: boolean;
+
+  /** Reason this transition is not possible in its current state. */
+  notPossibleReason?: string;
+  /** Reason this transition is not allowed for the requesting user. */
+  notAllowedReason?: string;
 }>;
 
 interface CanPerformTransitionParams {
@@ -74,7 +83,7 @@ interface BusinessEngine {
   /** Get a resource's data including calculated properties.
    *  Will exclude any fields that the requesting user is not permitted to view
    */
-  getResource(params: GetResourceParams): Promise<UnknownResource>;
+  getResource(params: GetResourceParams): Promise<UnknownResource | undefined>;
 
   /** Update data for a resource. */
   updateResource(params: UpdateResourceParams): Promise<UnknownResource>;
@@ -107,9 +116,33 @@ export default class PGBusinessEngine implements BusinessEngine {
   async getResource({ uid, type, asUser }: GetResourceParams) {
     const rawResult = await this.dataLoader.read(uid, type);
     // TODO: Derive calculated fields
-    // TODO: Omit fields the user does not have permission to read
+
+    if (!rawResult) {
+      return undefined;
+    }
+
+    // Enforce per-field read permissions
+    const visibleResult: RawUnknownResource = { state: rawResult.state };
+    // TODO: This needs to be updated to work with calculated properties
+    const resourceDef = this.system.resources[type];
+    for (const property in rawResult) {
+      if (
+        resourceDef.properties &&
+        resourceDef.properties[property] &&
+        resourceDef.properties[property].readPermissions
+      ) {
+        const perms = resourceDef.properties[property].readPermissions;
+        const result = evaluatePermissions(perms!, asUser, { self: rawResult });
+        if (result.decision === "allow") {
+          visibleResult[property] = rawResult[property];
+        }
+      } else {
+        visibleResult[property] = rawResult[property];
+      }
+    }
+
     // TODO: Validate data against system definition before returning
-    return { ...(rawResult as RawUnknownResource), uid, type };
+    return { ...visibleResult, uid, type };
   }
 
   async updateResource({ uid, type, asUser, data }: UpdateResourceParams) {
@@ -142,14 +175,48 @@ export default class PGBusinessEngine implements BusinessEngine {
 
     const result: DescribeTransitionsResult = [];
     for (const t in allTransitions) {
-      if (allTransitions[t].from.includes(resource.state)) {
-        // TODO: Evaluate rules to determine if transition
-        // is possible and/or allowed.
-        result.push({ to: t, possible: true, allowed: true });
+      const transition = allTransitions[t];
+      if (transition.from.includes(resource.state)) {
+        // Figure out if this transition is possible and/or allowed
+        const { possible, allowed } = this.evaluateTransitionPermissions(
+          transition,
+          asUser
+        );
+
+        result.push({
+          to: t,
+          possible: possible.decision === "allow",
+          notPossibleReason: possible.reason,
+          allowed: allowed.decision === "allow",
+          notAllowedReason: allowed.reason
+        });
       }
     }
 
     return result;
+  }
+
+  evaluateTransitionPermissions(
+    transition: TransitionDefinition,
+    asUser: User
+  ) {
+    // Figure out if this transition is possible given its current state.
+    // If no conditions are specified, the transition is always possible.
+    const possible: ConditionResult = !transition.conditions
+      ? { decision: "allow" }
+      : evaluateConditions(transition.conditions);
+
+    // Figure out if this transition is allowed given the current user.
+    // If no permissions are specified, the transition is always allowed
+    // as long as it is possible.
+    const allowed: ConditionResult =
+      possible.decision === "deny"
+        ? { decision: "deny", reason: possible.reason }
+        : !transition.permissions
+        ? { decision: "allow" }
+        : evaluatePermissions(transition.permissions, asUser, {});
+
+    return { possible, allowed };
   }
 
   async canPerformTransition({
@@ -178,6 +245,11 @@ export default class PGBusinessEngine implements BusinessEngine {
     // TODO: Evaluate conditions and permissions to determine if transition
     // is allowed.
 
-    return true;
+    const { allowed } = this.evaluateTransitionPermissions(
+      allTransitions[transition],
+      asUser
+    );
+
+    return allowed.decision === "allow";
   }
 }

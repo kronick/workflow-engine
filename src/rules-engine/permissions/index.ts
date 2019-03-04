@@ -16,7 +16,8 @@ import evaluateConditions, { ConditionResult } from "../conditions";
 
 export default function evaluatePermissions(
   def: PermissionDefinition,
-  user: User
+  user: User,
+  ctx: ExpressionContext
 ): ConditionResult {
   // Loop through each of the permissions definitions
   // If `user.role` matches the `roles` for a given definition,
@@ -79,7 +80,7 @@ export default function evaluatePermissions(
       // Evaluate conditions
       // TODO: Pass user into conditions context so it can be used in
       // when evaluating expressions.
-      return evaluateConditions(d.conditions, {});
+      return evaluateConditions(d.conditions, ctx);
     }
   }
   return { decision: "deny", reason: "Not allowed for this user." };

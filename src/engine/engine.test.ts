@@ -51,14 +51,14 @@ async function createSimpleSystem() {
     uid: "a",
     firstName: "Admin",
     lastName: "User",
-    role: "admin",
+    roles: ["admin"],
     email: "admin@example.com"
   };
   const regularUser: User = {
     uid: "a",
     firstName: "Regular",
     lastName: "User",
-    role: "regular",
+    roles: ["regular"],
     email: "user@example.com"
   };
   return { engine, resource: resource[0], adminUser, regularUser };
@@ -74,13 +74,13 @@ describe("Business engine", () => {
         regularUser
       } = await createSimpleSystem();
 
-      const readResult: UnknownResource = await engine.getResource({
+      const readResult: UnknownResource | undefined = await engine.getResource({
         ...resource,
         asUser: regularUser
       });
 
-      expect(readResult.state).toBe("off");
-      expect(readResult.maxVoltage).toBeDefined();
+      expect(readResult!.state).toBe("off");
+      expect(readResult!.maxVoltage).toBeDefined();
     });
 
     it("Enforces property-level read permissions", async () => {
@@ -91,21 +91,27 @@ describe("Business engine", () => {
         regularUser
       } = await createSimpleSystem();
 
-      const regularResult: UnknownResource = await engine.getResource({
+      const regularResult:
+        | UnknownResource
+        | undefined = await engine.getResource({
         ...resource,
         asUser: regularUser
       });
 
-      const adminResult: UnknownResource = await engine.getResource({
-        ...resource,
-        asUser: adminUser
-      });
+      const adminResult: UnknownResource | undefined = await engine.getResource(
+        {
+          ...resource,
+          asUser: adminUser
+        }
+      );
 
-      expect(regularResult.maxVoltage).toBeDefined();
-      expect(regularResult.password).toBeUndefined();
+      // Regular user can't see password
+      expect(regularResult!.maxVoltage).toBeDefined();
+      expect(regularResult!.password).toBeUndefined();
 
-      expect(adminResult.maxVoltage).toBeDefined();
-      expect(adminResult.password).toBeUndefined();
+      // Admin user can see passworrd
+      expect(adminResult!.maxVoltage).toBeDefined();
+      expect(adminResult!.password).toBeDefined();
     });
   });
 
