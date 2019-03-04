@@ -92,14 +92,14 @@ export interface TransitionDefinition {
   permissions?: PermissionDefinition;
 }
 
-export type PermissionDefinition = Array<
+export type PermissionDefinition = Array<PermissionRule>;
+export type PermissionRule =
   | {
       roles: string[];
       conditions: ConditionDefinition;
     }
   | DenyAlwaysDefiniton
-  | AllowAlwaysDefiniton
->;
+  | AllowAlwaysDefiniton;
 
 /** Conditions can either `allow` or `deny` and action based on the result of a
  *  boolean expression. Each condition also includes a human-readable
