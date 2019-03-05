@@ -1,6 +1,30 @@
-# Typescript & Node starter repo
+# Business Logic Engine
 
-This repo provides a minimal starting place to write, test, and run `node` scripts written in [Typescript](https://typescriptlang.org). It also configures [Jest](https://jestjs.io) for all your testing needs.
+## TODO:
+
+- [ ] Derive calculated fields
+- [ ] Demo frontend (run engine client-side)
+- [ ] References between resources
+- [ ] Action definition
+- [ ] Expression standard library
+- [ ] Custom functions in system definition
+- [ ] User objects in expressions
+- [ ] updateResource
+- [ ] Input objects to transitions &
+      actions
+- [ ] Input validation on updates, transitions, actions
+- [ ] Automatic audit history log
+- [ ] i18n?
+- [ ] E-mails and other side effects in actions
+- [ ] Per-resource read/write permissions
+- [ ] Decide if expressions need to be async
+- [ ] Consistent exception handling
+- [ ] Cache & transaction control for data loader API
+- [ ] SQL data loader
+- [ ] Cleaner object validation
+- [ ] Expression language docs
+- [ ] Deletion rules (cascade, conditions)
+- [ ] Service layer generator (REST & GraphQL)
 
 ## Usage
 

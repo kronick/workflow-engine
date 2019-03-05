@@ -242,9 +242,6 @@ export default class PGBusinessEngine implements BusinessEngine {
       return false;
     }
 
-    // TODO: Evaluate conditions and permissions to determine if transition
-    // is allowed.
-
     const { allowed } = this.evaluateTransitionPermissions(
       allTransitions[transition],
       asUser
