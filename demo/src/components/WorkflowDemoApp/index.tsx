@@ -1,6 +1,5 @@
-import * as React from "react";
+import React from "react";
 
-import brace from "brace";
 import AceEditor from "react-ace";
 
 import "brace/mode/json";
@@ -8,7 +7,8 @@ import "brace/theme/kuroir";
 
 import styles from "./WorkflowDemoApp.module.css";
 
-import { switchSystem } from "../../../../src/mocks/systems";
+//import { switchSystem } from "../../../../src/mocks/systems";
+const switchSystem = "";
 
 interface WorkflowDemoAppProps {}
 
@@ -20,7 +20,7 @@ export default class WorkflowDemoApp extends React.Component<
   WorkflowDemoAppProps,
   WorkflowDemoAppState
 > {
-  constructor(props) {
+  constructor(props: WorkflowDemoAppProps) {
     super(props);
     this.state = {
       systemDefinition: JSON.stringify(switchSystem)
@@ -37,9 +37,7 @@ export default class WorkflowDemoApp extends React.Component<
             <AceEditor
               mode="json"
               theme="kuroir"
-              name="blah2"
-              onLoad={this.onLoad}
-              onChange={this.onChange}
+              name="System Editor"
               fontSize={14}
               showPrintMargin={false}
               showGutter={false}
