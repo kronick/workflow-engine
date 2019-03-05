@@ -7,8 +7,7 @@ import "brace/theme/kuroir";
 
 import styles from "./WorkflowDemoApp.module.css";
 
-//import { switchSystem } from "../../../../src/mocks/systems";
-const switchSystem = "";
+import { switchSystem, DocumentSystem } from "../../data/systems";
 
 interface WorkflowDemoAppProps {}
 
@@ -23,7 +22,7 @@ export default class WorkflowDemoApp extends React.Component<
   constructor(props: WorkflowDemoAppProps) {
     super(props);
     this.state = {
-      systemDefinition: JSON.stringify(switchSystem)
+      systemDefinition: JSON.stringify(DocumentSystem, null, 2)
     };
   }
 
@@ -38,6 +37,7 @@ export default class WorkflowDemoApp extends React.Component<
               mode="json"
               theme="kuroir"
               name="System Editor"
+              width="100%"
               fontSize={14}
               showPrintMargin={false}
               showGutter={false}
