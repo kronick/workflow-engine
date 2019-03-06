@@ -10,3 +10,8 @@ if (require.main === module) {
     }
   })();
 }
+
+export * from "./engine";
+import PGBusinessEngine from "./engine";
+import { FakeInMemoryDataLoader, InMemoryDataLoader } from "./dataLoader/index";
+export { PGBusinessEngine, FakeInMemoryDataLoader, InMemoryDataLoader };

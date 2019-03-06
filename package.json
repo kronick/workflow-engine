@@ -1,16 +1,23 @@
 {
-  "name": "typescript-node-starter",
+  "name": "pg-workflow-engine",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "start": "ts-node src/index.ts",
     "build": "tsc -p .",
-    "start:live": "npm run build:live",
-    "build:live": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
+    "start:live": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
+    "build:live": "nodemon -e ts,js,tsx --exec 'tsc -p .'",
     "test": "yarn jest --verbose --coverage",
     "test:live": "yarn jest --watchAll",
     "benchmarks": "ts-node src/benchmarks.ts"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "demo/",
+      "dist/",
+      "coverage/"
+    ]
   },
   "husky": {
     "hooks": {

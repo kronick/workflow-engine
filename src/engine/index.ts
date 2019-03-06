@@ -39,6 +39,11 @@ interface DescribeTransitionsParams {
   asUser: User;
 }
 
+interface ListResourceParams {
+  type: string;
+  asUser: User;
+}
+
 interface UpdateResourceParams {
   /** Unique identifier of the resource to be updated.  */
   uid: string;
@@ -103,6 +108,14 @@ interface BusinessEngine {
    *  specified transition on the specified resource.
    */
   canPerformTransition(params: CanPerformTransitionParams): Promise<boolean>;
+
+  /** List the available resource types in the system */
+  listResourceTypes(): string[];
+
+  /** List all resources of a given type that are visible to the requesting user */
+  listResources(
+    params: ListResourceParams
+  ): Promise<Array<{ uid: string; type: string }>>;
 }
 export default class PGBusinessEngine implements BusinessEngine {
   system: SystemDefinition;
@@ -111,6 +124,17 @@ export default class PGBusinessEngine implements BusinessEngine {
   constructor(definition: SystemDefinition, dataLoader: DataLoader) {
     this.system = definition;
     this.dataLoader = dataLoader;
+  }
+
+  listResourceTypes() {
+    return Object.keys(this.system.resources);
+  }
+
+  /** List all resources of a given type that are visible to the requesting user */
+  async listResources(params: ListResourceParams) {
+    // TODO: Filter non-visible resources when per-resource visibility
+    // permissions are set up
+    return await this.dataLoader.list(params.type);
   }
 
   async getResource({ uid, type, asUser }: GetResourceParams) {

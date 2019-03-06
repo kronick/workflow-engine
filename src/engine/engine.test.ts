@@ -43,8 +43,8 @@ const simpleSystem: SystemDefinition = {
 };
 
 /** Test helper that will create a system with asingle `Switch` resource */
-async function createSimpleSystem() {
-  const dataLoader = new FakeInMemoryDataLoader(simpleSystem, 1);
+async function createSimpleSystem(n: number = 1) {
+  const dataLoader = new FakeInMemoryDataLoader(simpleSystem, n);
   const resource = await dataLoader.list("Switch");
   const engine = new PGBusinessEngine(simpleSystem, dataLoader);
   const adminUser: User = {
@@ -65,6 +65,21 @@ async function createSimpleSystem() {
 }
 
 describe("Business engine", () => {
+  describe("Listing", () => {
+    it("can list resource types", async () => {
+      const { engine } = await createSimpleSystem();
+      expect(engine.listResourceTypes()).toEqual(["Switch"]);
+    });
+
+    it("can list resources of a given type", async () => {
+      const { engine, adminUser } = await createSimpleSystem(5);
+      const resources = await await engine.listResources({
+        type: "Switch",
+        asUser: adminUser
+      });
+      expect(resources.length).toEqual(5);
+    });
+  });
   describe("Performs CRUD operations", () => {
     it("Can read a resource", async () => {
       const {

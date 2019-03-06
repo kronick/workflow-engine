@@ -28,6 +28,13 @@ export class InMemoryDataLoader implements DataLoader {
     this.definition = definition;
   }
 
+  /** Change the system definition after an instance has been instantiated.
+   *  Use at your own risk.
+   */
+  loadDefinition(d: SystemDefinition) {
+    this.definition = d;
+  }
+
   create(type: string, data: { state: string }) {
     // TODO: Fail if `data` doesn't match the shape of the
     //       object definition.

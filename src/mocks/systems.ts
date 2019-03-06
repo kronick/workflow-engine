@@ -3,7 +3,7 @@ import { FakeInMemoryDataLoader } from "../dataLoader";
 import PGBusinessEngine from "../engine";
 
 export const switchSystem: SystemDefinition = {
-  name: "Simple system",
+  name: "Simple system!!",
   roles: ["regular", "admin"],
   resources: {
     Switch: {
@@ -52,14 +52,14 @@ export async function createSimpleSystem(
     uid: "a",
     firstName: "Admin",
     lastName: "User",
-    role: "admin",
+    roles: ["admin"],
     email: "admin@example.com"
   };
   const regularUser: User = {
     uid: "a",
     firstName: "Regular",
     lastName: "User",
-    role: "regular",
+    roles: ["regular"],
     email: "user@example.com"
   };
   return { engine, resources, adminUser, regularUser };

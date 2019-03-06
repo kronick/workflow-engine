@@ -1,9 +1,5 @@
 import { Expression } from "../../types";
-import { DataLoader } from "../../dataLoader";
-import { UnknownResource } from "../../engine";
 import { IfExpression, ExpressionResult } from "../../types/expressions";
-import { definition } from "../../example/change-management";
-import { isContext } from "vm";
 
 export interface ExpressionContext {
   // dataLoader: DataLoader;

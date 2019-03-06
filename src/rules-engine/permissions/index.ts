@@ -17,7 +17,7 @@ import evaluateConditions, { ConditionResult } from "../conditions";
 export default function evaluatePermissions(
   def: PermissionDefinition,
   user: User,
-  ctx: ExpressionContext
+  ctx: ExpressionContext = {}
 ): ConditionResult {
   // Loop through each of the permissions definitions
   // If `user.role` matches the `roles` for a given definition,

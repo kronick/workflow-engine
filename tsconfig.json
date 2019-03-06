@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es5",
     "lib": ["es6", "dom", "dom.iterable", "esnext"],
-    "allowJs": true,
+    "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -13,8 +13,11 @@
     "resolveJsonModule": true,
     "downlevelIteration": true,
     //"isolatedModules": true,
-    "noEmit": true,
-    "jsx": "preserve"
+    "noEmit": false,
+    "jsx": "preserve",
+    "outDir": "dist",
+    "declaration": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["dist"]
 }
