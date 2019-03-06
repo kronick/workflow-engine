@@ -2,26 +2,28 @@ import React from "react";
 import AceEditor from "react-ace";
 
 import "brace/mode/json";
-import "brace/theme/kuroir";
+import "brace/theme/github";
 
-import styles from "./SystemEditor.module.css";
+import styles from "./JSONEditor.module.css";
 
-interface SystemEditorProps {
+interface JSONEditorProps {
   contents: string;
   onBuild: (neValue: string) => void;
   error?: string | null;
+  maxLines: number;
+  title: string;
 }
 
-interface SystemEditorState {
+interface JSONEditorState {
   dirty: boolean;
   contents: string;
 }
 
-export default class SystemEditor extends React.Component<
-  SystemEditorProps,
-  SystemEditorState
+export default class JSONEditor extends React.Component<
+  JSONEditorProps,
+  JSONEditorState
 > {
-  constructor(props: SystemEditorProps) {
+  constructor(props: JSONEditorProps) {
     super(props);
     this.state = {
       dirty: false,
@@ -29,7 +31,7 @@ export default class SystemEditor extends React.Component<
     };
   }
 
-  componentDidUpdate(prevProps: SystemEditorProps) {
+  componentDidUpdate(prevProps: JSONEditorProps) {
     if (this.props.contents !== prevProps.contents) {
       this.setState({ contents: this.props.contents, dirty: false });
     }
@@ -44,15 +46,18 @@ export default class SystemEditor extends React.Component<
   };
 
   render() {
+    //const messasge =
     return (
       <div className={styles.container}>
+        <div className={styles.title}>{this.props.title}</div>
         <div className={styles.editorContainer}>
           <AceEditor
             className={styles.editor}
             mode="json"
-            theme="kuroir"
+            theme="github"
             name="System Editor"
-            maxLines={Infinity}
+            height={"100%"}
+            maxLines={this.props.maxLines}
             fontSize={14}
             onChange={this.handleChange}
             showPrintMargin={false}
@@ -73,7 +78,7 @@ export default class SystemEditor extends React.Component<
           />
         </div>
         <div className={styles.controls}>
-          <div className={styles.error}>
+          <div className={styles.message}>
             {this.props.error ? `${this.props.error} ❌` : "✅"}
           </div>
           <button disabled={!this.state.dirty} onClick={this.rebuild}>

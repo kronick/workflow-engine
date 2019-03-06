@@ -1,0 +1,53 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  align-items: flex-start;
+  margin-left: 0.5em;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro",
+    "monospace";
+}
+
+.editorContainer {
+  width: 100%;
+  height: 100%;
+  flex-grow: 1;
+  overflow-y: scroll;
+}
+
+.controls {
+  flex-grow: 0;
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  font-size: 16pt;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-bottom: 0.5em;
+  border-bottom: 1px solid rgb(232, 233, 232);
+}
+
+.message {
+  font-size: 10pt;
+}
+.message.error {
+  color: rgb(203, 48, 72);
+}
+
+.controls button {
+  font-size: 14pt;
+}
+
+.title {
+  display: inline;
+
+  padding: 0.5em;
+  padding-bottom: 1em;
+  margin-bottom: -0.75em;
+  margin-top: 0.5em;
+  border-radius: 0.5em;
+
+  font-size: 10pt;
+  background: rgb(232, 233, 232);
+}

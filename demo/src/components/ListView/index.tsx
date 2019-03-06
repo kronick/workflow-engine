@@ -1,4 +1,4 @@
-import React from "react";
+import React, { ChangeEvent } from "react";
 import { SystemDefinition } from "pg-workflow-engine/dist/types";
 import { PGBusinessEngine } from "pg-workflow-engine";
 import { ResourceID } from "../WorkflowDemoApp";
@@ -8,30 +8,37 @@ interface ListViewProps {
     [type: string]: Array<{ uid: string }>;
   };
 
+  selected?: ResourceID;
+
   onSelect: (id: ResourceID) => void;
 }
 
 export default class ListView extends React.Component<ListViewProps> {
+  handleChange = (ev: ChangeEvent<HTMLSelectElement>) => {
+    const [type, uid] = ev.target.value.split("#");
+    this.props.onSelect({ type, uid });
+  };
+
   render() {
     return (
-      <ul>
+      <select onChange={this.handleChange} className="BigSelect">
         {Object.keys(this.props.resources).map(t => (
-          <li>
-            {t}
-            <ul>
-              {this.props.resources[t].map(r => (
-                <li>
-                  <button
-                    onClick={() => this.props.onSelect({ uid: r.uid, type: t })}
-                  >
-                    {r.uid}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </li>
+          <optgroup label={t}>
+            {this.props.resources[t].map(r => (
+              <option
+                value={`${t}#${r.uid}`}
+                selected={
+                  this.props.selected &&
+                  this.props.selected.uid === r.uid &&
+                  this.props.selected.type === t
+                }
+              >
+                {t}#{r.uid}
+              </option>
+            ))}
+          </optgroup>
         ))}
-      </ul>
+      </select>
     );
   }
 }

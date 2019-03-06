@@ -6,8 +6,23 @@
 }
 
 .leftPanel {
-  height: 100vh;
+  height: 100%;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.userEditorView {
+  /* flex: 1; */
+  flex-shrink: 1;
+}
+
+.systemEditorView {
+  /* flex: 3; */
+  height: 100%;
+  overflow: hidden;
+  flex-shrink: 1;
 }
 
 .midPanel {
@@ -23,7 +38,8 @@
 }
 
 .listView {
-  flex: 5;
+  flex-grow: 0;
+  padding: 0.25em;
 }
 
 .rightPanel {

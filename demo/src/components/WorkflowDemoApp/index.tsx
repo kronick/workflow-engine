@@ -8,11 +8,11 @@ import {
 } from "pg-workflow-engine/dist/dataLoader";
 import { User } from "pg-workflow-engine/dist/types";
 
-import SystemEditor from "../SystemEditor";
+import JSONEditor from "../JSONEditor";
 import ListView from "../ListView/index";
 
 import styles from "./WorkflowDemoApp.module.css";
-import { timingSafeEqual } from "crypto";
+import "./GlobalStyles.css";
 
 interface WorkflowDemoAppProps {}
 
@@ -22,6 +22,7 @@ interface WorkflowDemoAppState {
   engine: PGBusinessEngine;
 
   systemError?: string | null;
+  userError?: string | null;
 
   resourceList: ResourceList;
   user: User;
@@ -63,7 +64,8 @@ export default class WorkflowDemoApp extends React.Component<
     if (
       this.state.engine !== prevState.engine ||
       this.state.dataLoader !== prevState.dataLoader ||
-      this.state.selectedResourceID !== prevState.selectedResourceID
+      this.state.selectedResourceID !== prevState.selectedResourceID ||
+      this.state.user !== prevState.user
     ) {
       this.refetchData();
     }
@@ -82,10 +84,20 @@ export default class WorkflowDemoApp extends React.Component<
         engine,
         dataLoader,
         systemError: null,
-        systemDefinition: newDefinition
+        systemDefinition: JSON.stringify(parsed, null, 2),
+        selectedResourceID: null
       });
     } catch (e) {
       this.setState({ systemError: e.toString() });
+    }
+  };
+
+  updateUser = (newDefinition: string) => {
+    try {
+      const parsed = JSON.parse(newDefinition);
+      this.setState({ user: parsed, userError: null });
+    } catch (e) {
+      this.setState({ userError: e.toString() });
     }
   };
 
@@ -109,6 +121,15 @@ export default class WorkflowDemoApp extends React.Component<
       } else {
         console.error("Cannot find resource", this.state.selectedResourceID);
       }
+    } else {
+      try {
+        this.setState({
+          selectedResourceID: {
+            type: types[0],
+            uid: resourceList[types[0]][0].uid
+          }
+        });
+      } catch (e) {}
     }
 
     this.setState({ resourceList });
@@ -122,11 +143,24 @@ export default class WorkflowDemoApp extends React.Component<
     return (
       <div className={styles.app}>
         <div className={styles.leftPanel}>
-          <SystemEditor
-            contents={this.state.systemDefinition}
-            onBuild={this.rebuildEngine}
-            error={this.state.systemError}
-          />
+          <div className={styles.userEditorView}>
+            <JSONEditor
+              title="User definition"
+              contents={JSON.stringify(this.state.user, null, 2)}
+              onBuild={this.updateUser}
+              error={this.state.userError}
+              maxLines={10}
+            />
+          </div>
+          <div className={styles.systemEditorView}>
+            <JSONEditor
+              title="System definition"
+              contents={this.state.systemDefinition}
+              onBuild={this.rebuildEngine}
+              error={this.state.systemError}
+              maxLines={Infinity}
+            />
+          </div>
         </div>
         <div className={styles.midPanel}>
           <div className={styles.listView}>
