@@ -1,4 +1,4 @@
-import { Expression } from "../../types";
+import { Expression, User } from "../../types";
 import { IfExpression, ExpressionResult } from "../../types/expressions";
 
 export interface ExpressionContext {
@@ -12,6 +12,7 @@ export interface ExpressionContext {
   closures?: { [name: string]: any };
 
   self?: { [property: string]: any } | null;
+  user?: User;
   stack?: string[];
 
   // TODO: Need to store and mark nodes to detect circular references
@@ -140,6 +141,15 @@ const operatorMap: OperatorMap = {
 
   eq: ([A, B], ctx) => $string(A, ctx) === $string(B, ctx),
 
+  exists: ({ property, from }, ctx) => {
+    if (from) throw new NotImplemented("exists from");
+    if (!ctx.self) throw new ExpressionTypeError("self", null);
+
+    return ctx.self[property] !== undefined;
+  },
+
+  /** Returns a boolean indicating whether the `needle` object occurs in the
+   *  `haystack` array */
   contains: ({ needle, haystack }, ctx) => {
     if (needle === undefined || haystack === undefined) {
       throw new SyntaxError(
@@ -176,7 +186,7 @@ const operatorMap: OperatorMap = {
     }
 
     if (from) throw new NotImplemented("get from");
-    if (!ctx.self) throw new ExpressionTypeError("object", null);
+    if (!ctx.self) throw new ExpressionTypeError("self", null);
 
     return ctx.self[property];
   },

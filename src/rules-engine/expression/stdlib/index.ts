@@ -1,4 +1,5 @@
 import { ExpressionContext } from "../";
+import { Expression } from "../../../types";
 
 /** Standard library functions for working with resources and their properties.
  *
@@ -8,7 +9,7 @@ import { ExpressionContext } from "../";
  *  natively by the interpreter to improve performance.
  */
 
-const stdlib = {
+const stdlib: { [f: string]: Expression } = {
   inState: {
     contains: { haystack: { $: "states" }, needle: { get: "state" } }
   }

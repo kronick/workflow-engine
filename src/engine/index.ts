@@ -65,7 +65,7 @@ interface UpdateResourceParams {
 
 export type DescribeTransitionsResult = Array<{
   /** Target state */
-  to: string;
+  action: string;
 
   /** Whether or not this transition is possible given its current state*/
   possible: boolean;
@@ -74,9 +74,9 @@ export type DescribeTransitionsResult = Array<{
   allowed: boolean;
 
   /** Reason this transition is not possible in its current state. */
-  notPossibleReason?: string;
+  possibleReason?: string;
   /** Reason this transition is not allowed for the requesting user. */
-  notAllowedReason?: string;
+  allowedReason?: string;
 }>;
 
 interface CanPerformTransitionParams {
@@ -206,15 +206,16 @@ export default class PGBusinessEngine implements BusinessEngine {
         // Figure out if this transition is possible and/or allowed
         const { possible, allowed } = this.evaluateTransitionPermissions(
           transition,
+          resource,
           asUser
         );
 
         result.push({
-          to: t,
+          action: t,
           possible: possible.decision === "allow",
-          notPossibleReason: possible.reason,
+          possibleReason: possible.reason,
           allowed: allowed.decision === "allow",
-          notAllowedReason: allowed.reason
+          allowedReason: allowed.reason
         });
       }
     }
@@ -224,13 +225,17 @@ export default class PGBusinessEngine implements BusinessEngine {
 
   evaluateTransitionPermissions(
     transition: TransitionDefinition,
+    resource: RawUnknownResource,
     asUser: User
   ) {
     // Figure out if this transition is possible given its current state.
     // If no conditions are specified, the transition is always possible.
     const possible: ConditionResult = !transition.conditions
       ? { decision: "allow" }
-      : evaluateConditions(transition.conditions);
+      : evaluateConditions(
+          transition.conditions,
+          stdlibCtx({ self: resource })
+        );
 
     // Figure out if this transition is allowed given the current user.
     // If no permissions are specified, the transition is always allowed
@@ -240,7 +245,11 @@ export default class PGBusinessEngine implements BusinessEngine {
         ? { decision: "deny", reason: possible.reason }
         : !transition.permissions
         ? { decision: "allow" }
-        : evaluatePermissions(transition.permissions, asUser, stdlibCtx({}));
+        : evaluatePermissions(
+            transition.permissions,
+            asUser,
+            stdlibCtx({ self: resource })
+          );
 
     return { possible, allowed };
   }
@@ -270,6 +279,7 @@ export default class PGBusinessEngine implements BusinessEngine {
 
     const { allowed } = this.evaluateTransitionPermissions(
       allTransitions[transition],
+      resource,
       asUser
     );
 

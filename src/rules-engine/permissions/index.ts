@@ -80,7 +80,7 @@ export default function evaluatePermissions(
       // Evaluate conditions
       // TODO: Pass user into conditions context so it can be used in
       // when evaluating expressions.
-      return evaluateConditions(d.conditions, ctx);
+      return evaluateConditions(d.conditions, { ...ctx, user });
     }
   }
   return { decision: "deny", reason: "Not allowed for this user." };

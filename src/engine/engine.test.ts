@@ -144,10 +144,10 @@ describe("Business engine", () => {
   });
 
   describe("State transitions", () => {
-    const includesTransitionTo = (
-      transition: DescribeTransitionsResult,
+    const includesAction = (
+      actionResults: DescribeTransitionsResult,
       to: string
-    ) => transition.some(t => t.to === to);
+    ) => actionResults.some(t => t.action === to);
 
     it("Can describe the available transitions", async () => {
       const {
@@ -162,8 +162,8 @@ describe("Business engine", () => {
         asUser: regularUser
       });
 
-      expect(includesTransitionTo(transitions, "turnOn")).toBeTruthy();
-      expect(includesTransitionTo(transitions, "turnOff")).toBeFalsy();
+      expect(includesAction(transitions, "turnOn")).toBeTruthy();
+      expect(includesAction(transitions, "turnOff")).toBeFalsy();
     });
 
     it("Enforces permissions on state transitions", async () => {
@@ -185,17 +185,18 @@ describe("Business engine", () => {
       });
 
       expect(
-        transitionsForRegular.filter(t => t.to === "turnOnTurbo")[0].possible
+        transitionsForRegular.filter(t => t.action === "turnOnTurbo")[0]
+          .possible
       ).toBeTruthy();
       expect(
-        transitionsForAdmin.filter(t => t.to === "turnOnTurbo")[0].possible
+        transitionsForAdmin.filter(t => t.action === "turnOnTurbo")[0].possible
       ).toBeTruthy();
 
       expect(
-        transitionsForRegular.filter(t => t.to === "turnOnTurbo")[0].allowed
+        transitionsForRegular.filter(t => t.action === "turnOnTurbo")[0].allowed
       ).toBeFalsy();
       expect(
-        transitionsForAdmin.filter(t => t.to === "turnOnTurbo")[0].allowed
+        transitionsForAdmin.filter(t => t.action === "turnOnTurbo")[0].allowed
       ).toBeTruthy();
     });
 

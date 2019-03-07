@@ -1,6 +1,63 @@
-.propertyValue {
-  display: inline-block;
+.container {
+  margin-left: 2em;
+  margin-right: 2em;
 }
+.propertyTable {
+  display: table;
+  border-collapse: collapse;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.propertyTable td {
+  padding: 0.25em;
+  vertical-align: middle;
+}
+
+.propertyName {
+  text-align: right;
+  font-style: oblique;
+  font-size: 16pt;
+}
+.propertyName:after {
+  content: ":";
+}
+
+.propertyValue {
+  width: 100%;
+}
+
+.propertyValue input {
+  font-size: 14pt;
+  padding: 0.25em;
+}
+.propertyValue input[type="text"] {
+  width: 100%;
+}
+
+.propertyValue textarea {
+  width: 100%;
+  height: 6em;
+  padding: 0.25em;
+  font-size: 14pt;
+}
+
 .undefinedValue {
   color: #888;
+}
+
+.actionName {
+  text-align: right;
+}
+.actionRow {
+  text-align: center;
+}
+
+.actionButton {
+  font-size: 14pt;
+}
+
+.actionReason {
+  color: #888;
+  font-style: oblique;
 }

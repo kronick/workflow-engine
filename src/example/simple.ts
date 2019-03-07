@@ -221,6 +221,15 @@ export const simpleDefinition: SystemDefinition = {
               roles: ["author"],
               conditions: ["allow"]
             },
+            {
+              roles: ["reviewer"],
+              conditions: [
+                {
+                  denyWithMessage:
+                    "Only authors can send a document for review."
+                }
+              ]
+            },
             "deny"
           ]
         },

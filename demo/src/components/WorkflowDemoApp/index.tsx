@@ -173,6 +173,7 @@ export default class WorkflowDemoApp extends React.Component<
           </div>
           <div className={styles.docView}>
             <ResourceDetail
+              user={this.state.user}
               engine={this.state.engine}
               resource={this.state.selectedResourceData}
             />

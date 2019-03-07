@@ -23,9 +23,10 @@ export default class ListView extends React.Component<ListViewProps> {
     return (
       <select onChange={this.handleChange} className="BigSelect">
         {Object.keys(this.props.resources).map(t => (
-          <optgroup label={t}>
+          <optgroup key={t} label={t}>
             {this.props.resources[t].map(r => (
               <option
+                key={r.uid}
                 value={`${t}#${r.uid}`}
                 selected={
                   this.props.selected &&

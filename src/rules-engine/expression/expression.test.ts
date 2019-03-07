@@ -254,6 +254,13 @@ describe("Expression evaluator", () => {
       expect(evaluate(exp, ctx1)).toEqual(100);
       expect(evaluate(exp, ctx2)).toEqual(5);
     });
+
+    it("evaluates `exists` expression", () => {
+      const ctx = { self: { name: "ooo", bang: undefined } };
+      expect(evaluate({ exists: { property: "name" } }, ctx)).toBe(true);
+      expect(evaluate({ exists: { property: "bang" } }, ctx)).toBe(false);
+      expect(evaluate({ exists: { property: "lalala" } }, ctx)).toBe(false);
+    });
   });
 
   describe("Defined functions", () => {
