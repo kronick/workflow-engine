@@ -2,6 +2,7 @@ import React from "react";
 
 import { PGBusinessEngine } from "pg-workflow-engine";
 import { switchSystem } from "pg-workflow-engine/dist/mocks/systems";
+import { simpleDefinition } from "pg-workflow-engine/dist/example/simple";
 import {
   InMemoryDataLoader,
   FakeInMemoryDataLoader
@@ -13,6 +14,7 @@ import ListView from "../ListView/index";
 
 import styles from "./WorkflowDemoApp.module.css";
 import "./GlobalStyles.css";
+import ResourceDetail from "../ResourceDetail";
 
 interface WorkflowDemoAppProps {}
 
@@ -41,11 +43,11 @@ export default class WorkflowDemoApp extends React.Component<
 > {
   constructor(props: WorkflowDemoAppProps) {
     super(props);
-    const dataLoader = new FakeInMemoryDataLoader(switchSystem, 5);
+    const dataLoader = new FakeInMemoryDataLoader(simpleDefinition, 5);
     this.state = {
-      systemDefinition: JSON.stringify(switchSystem, null, 2),
+      systemDefinition: JSON.stringify(simpleDefinition, null, 2),
       dataLoader,
-      engine: new PGBusinessEngine(switchSystem, dataLoader),
+      engine: new PGBusinessEngine(simpleDefinition, dataLoader),
       resourceList: {},
       user: { uid: "0", roles: [], firstName: "", lastName: "", email: "" },
       selectedResourceID: null,
@@ -170,13 +172,13 @@ export default class WorkflowDemoApp extends React.Component<
             />
           </div>
           <div className={styles.docView}>
-            {JSON.stringify(this.state.selectedResourceData)}
+            <ResourceDetail
+              engine={this.state.engine}
+              resource={this.state.selectedResourceData}
+            />
           </div>
         </div>
         <div className={styles.rightPanel}>
-          <div className={styles.userView}>
-            {JSON.stringify(this.state.user)}
-          </div>
           <div className={styles.expressionsView}>Expressions</div>
         </div>
       </div>

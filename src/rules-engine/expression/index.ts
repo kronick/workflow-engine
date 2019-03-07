@@ -6,7 +6,7 @@ export interface ExpressionContext {
   // definition: SystemDefinition;
 
   /** Custom-defined named functions (lambdas) */
-  definitions?: { [name: string]: Expression };
+  functions?: { [name: string]: Expression };
 
   /** Variables captured by the context's current lambda*/
   closures?: { [name: string]: any };
@@ -70,7 +70,7 @@ export default function e(
 
     if (!operatorMap[op]) {
       // Look in context for custom function with this operator
-      if (context.definitions && context.definitions[op]) {
+      if (context.functions && context.functions[op]) {
         return useDefinition(op, args, context);
       }
       throw new InvalidOperator(op);
@@ -96,7 +96,7 @@ function useDefinition(
   args: any,
   context: ExpressionContext
 ): ExpressionResult {
-  const def = context.definitions![op];
+  const def = context.functions![op];
 
   // Put argument values into context's closure
   context = { ...context, closures: { ...context.closures, ...args } };
@@ -140,6 +140,27 @@ const operatorMap: OperatorMap = {
 
   eq: ([A, B], ctx) => $string(A, ctx) === $string(B, ctx),
 
+  contains: ({ needle, haystack }, ctx) => {
+    if (needle === undefined || haystack === undefined) {
+      throw new SyntaxError(
+        "'contains' expression requires both a 'needle' and a 'haystack' parameter"
+      );
+    }
+
+    haystack = $array(haystack, ctx);
+    needle = e(needle, ctx);
+    const firstType = typeof haystack[0];
+    if (haystack.some((a: unknown) => typeof a !== firstType)) {
+      // TODO: This should be a different exception
+      throw new ExpressionTypeError(firstType, haystack);
+    }
+    if (typeof needle !== typeof firstType) {
+      throw new ExpressionTypeError(firstType, needle);
+    }
+
+    return haystack.includes(needle);
+  },
+
   /** This function accesses a property on an object in the current context.
    *  If the `from` argument is not specified, this argument uses the object
    *  in the context's `self` property.
@@ -160,6 +181,7 @@ const operatorMap: OperatorMap = {
     return ctx.self[property];
   },
 
+  /** This function access an argument set in a lambda / defined function */
   $: (name: string | number, ctx) => {
     if (!ctx.closures || !ctx.closures.hasOwnProperty(name))
       throw new MissingArgument(name);
@@ -195,6 +217,16 @@ function $boolean(n: any, ctx: ExpressionContext) {
     throw new ExpressionTypeError("boolean", evaluated);
 
   return evaluated;
+}
+
+/** Evaluate an expression and expect an array as a return value.
+ *  Throws an error if it is any other type */
+function $array(n: any, ctx: ExpressionContext) {
+  const evaluated = e(n, ctx);
+  if (!Array.isArray(evaluated))
+    throw new ExpressionTypeError("array", evaluated);
+
+  return (evaluated as unknown) as Array<string | number | boolean>;
 }
 
 export function stackRepresentation(e: Expression) {

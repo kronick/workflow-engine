@@ -13,7 +13,20 @@ const simpleSystem: SystemDefinition = {
       states: ["off", "on", "turbo"],
       properties: {
         maxVoltage: {
-          type: "number"
+          type: "number",
+          readPermissions: [
+            { roles: ["admin"], conditions: ["allow"] },
+            {
+              roles: ["regular"],
+              conditions: [
+                {
+                  allowIf: { inState: { states: ["off"] } },
+                  denyMessage:
+                    "You can only view maxVoltage when the switch is off"
+                }
+              ]
+            }
+          ]
         },
         password: {
           type: "string",

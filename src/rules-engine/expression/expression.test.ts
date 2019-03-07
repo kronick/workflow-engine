@@ -121,6 +121,60 @@ describe("Expression evaluator", () => {
     });
   });
 
+  describe("Array operators", () => {
+    it("Evaluates `contains` operator", () => {
+      expect(
+        evaluate({
+          contains: { needle: "fin", haystack: ["fan", "fin", "foo"] }
+        })
+      ).toBe(true);
+      expect(
+        evaluate({
+          contains: { needle: "fun", haystack: ["fan", "fin", "foo"] }
+        })
+      ).toBe(false);
+    });
+
+    it("Throws an exception when `contains` types are incorrect", () => {
+      expect(() =>
+        evaluate({ contains: { needle: 6, haystack: ["1", "2", "3"] } })
+      ).toThrow();
+      expect(() =>
+        evaluate({ contains: { needle: 6, haystack: 7 } as any })
+      ).toThrow();
+    });
+
+    it("can evaluate `contains` on an array retrieved from context", () => {
+      expect(
+        evaluate(
+          {
+            contains: {
+              needle: "fin",
+              haystack: { get: "haystack" }
+            }
+          },
+          {
+            self: { haystack: ["fan", "fin", "foo"] }
+          }
+        )
+      ).toBe(true);
+
+      expect(
+        evaluate(
+          {
+            contains: {
+              needle: { get: "needle" },
+              haystack: ["fan", "fin", "foo"]
+            }
+          },
+          {
+            self: { needle: "fin" }
+          }
+        )
+      ).toBe(true);
+    });
+  });
+
   describe("Special forms and recursion", () => {
     it("evaluates an if/then/else expression", () => {
       const trueExpression: Expression = { if: true, then: "Yes", else: "No" };
@@ -205,7 +259,7 @@ describe("Expression evaluator", () => {
   describe("Defined functions", () => {
     it("evaluates a trivial function ", () => {
       const ctx = {
-        definitions: {
+        functions: {
           PI: 3.14159
         }
       };
@@ -214,7 +268,7 @@ describe("Expression evaluator", () => {
 
     it("evaluates a trivial function with no arguments", () => {
       const ctx = {
-        definitions: {
+        functions: {
           three: { "+": [1, 2] }
         }
       };
@@ -223,7 +277,7 @@ describe("Expression evaluator", () => {
 
     it("evaluates a defined function with array of arguments", () => {
       const ctx = {
-        definitions: {
+        functions: {
           add: { "+": [{ $: 0 }, { $: 1 }] }
         }
       };
@@ -232,7 +286,7 @@ describe("Expression evaluator", () => {
 
     it("evaluates a defined function with named arguments", () => {
       const ctx = {
-        definitions: {
+        functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] }
         }
       };
@@ -241,7 +295,7 @@ describe("Expression evaluator", () => {
 
     it("evaluates nested defined functions with non-overlapping named arguments", () => {
       const ctx = {
-        definitions: {
+        functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] },
           subtract: { "-": [{ $: "X" }, { $: "Y" }] }
         }
@@ -255,7 +309,7 @@ describe("Expression evaluator", () => {
     });
     it("evaluates nested defined functions with overlapping named arguments", () => {
       const ctx = {
-        definitions: {
+        functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] },
           subtract: { "-": [{ $: "A" }, { $: "B" }] }
         }
@@ -270,7 +324,7 @@ describe("Expression evaluator", () => {
 
     it("throws an error when trying to access missing argument", () => {
       const ctx = {
-        definitions: {
+        functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] }
         }
       };
@@ -279,7 +333,7 @@ describe("Expression evaluator", () => {
 
     it("throws an error when argument is of wrong type", () => {
       const ctx = {
-        definitions: {
+        functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] }
         }
       };

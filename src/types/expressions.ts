@@ -63,6 +63,7 @@ export type BooleanProducingExpression =
   | EqualExpression
   | StringEqualityExpression
   | IfExpression
+  | ContainsExpression<any>
   | GetExpression
   | ArgExpression;
 
@@ -76,11 +77,23 @@ export type StringProducingExpression =
 export type ArrayProducingExpression<
   T extends ExpressionResultTypes
 > = T extends "number"
-  ? (NumberProducingExpression[] | GetAllExpression<"number[]">)
+  ? (
+      | NumberProducingExpression[]
+      | GetAllExpression<"number[]">
+      | GetExpression<"number[]">
+      | ArgExpression)
   : T extends "string"
-  ? (StringProducingExpression[] | GetAllExpression<"string[]">)
+  ? (
+      | StringProducingExpression[]
+      | GetAllExpression<"string[]">
+      | GetExpression<"string[]">
+      | ArgExpression)
   : T extends "boolean"
-  ? (BooleanProducingExpression[] | GetAllExpression<"boolean[]">)
+  ? (
+      | BooleanProducingExpression[]
+      | GetAllExpression<"boolean[]">
+      | GetExpression<"boolean[]">
+      | ArgExpression)
   : never;
 
 export type ResourceProducingExpression =
@@ -160,6 +173,18 @@ export interface InStateExpression {
   inState: {
     resource?: ResourceProducingExpression;
     states: ArrayProducingExpression<"string">;
+  };
+}
+
+/** An expression that returns `true` if an array contains a given value */
+interface ContainsExpression<T extends ExpressionResultTypes> {
+  contains: {
+    haystack: ArrayProducingExpression<T>;
+    needle: T extends "string"
+      ? StringProducingExpression
+      : T extends "number"
+      ? NumberProducingExpression
+      : any;
   };
 }
 

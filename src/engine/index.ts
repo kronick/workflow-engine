@@ -4,6 +4,7 @@ import evaluateConditions from "../rules-engine/conditions";
 import evaluatePermissions from "../rules-engine/permissions";
 import { ConditionResult } from "../rules-engine/conditions/index";
 import { TransitionDefinition } from "../types/resources";
+import { stdlibCtx } from "../rules-engine/expression/stdlib";
 
 export interface RawUnknownResource {
   [property: string]: unknown;
@@ -156,7 +157,8 @@ export default class PGBusinessEngine implements BusinessEngine {
         resourceDef.properties[property].readPermissions
       ) {
         const perms = resourceDef.properties[property].readPermissions;
-        const result = evaluatePermissions(perms!, asUser, { self: rawResult });
+        const ctx = { self: rawResult };
+        const result = evaluatePermissions(perms!, asUser, stdlibCtx(ctx));
         if (result.decision === "allow") {
           visibleResult[property] = rawResult[property];
         }
@@ -238,7 +240,7 @@ export default class PGBusinessEngine implements BusinessEngine {
         ? { decision: "deny", reason: possible.reason }
         : !transition.permissions
         ? { decision: "allow" }
-        : evaluatePermissions(transition.permissions, asUser, {});
+        : evaluatePermissions(transition.permissions, asUser, stdlibCtx({}));
 
     return { possible, allowed };
   }
