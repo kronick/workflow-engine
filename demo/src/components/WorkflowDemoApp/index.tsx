@@ -31,9 +31,15 @@ interface WorkflowDemoAppState {
 
   selectedResourceID: ResourceID | null;
   selectedResourceData: ResourceData | null;
+
+  consoleOutput: ConsoleMessage[];
 }
 
-export type ResourceData = ResourceID & { [property: string]: unknown };
+type ConsoleMessage = { type: "error" | "warning" | "debug"; text: string };
+
+export type ResourceData = {
+  [property: string]: { value: unknown; errors: string[] };
+} & ResourceID & { state: string };
 export type ResourceID = { uid: string; type: string };
 type ResourceList = { [type: string]: ResourceID[] };
 
@@ -51,7 +57,8 @@ export default class WorkflowDemoApp extends React.Component<
       resourceList: {},
       user: { uid: "0", roles: [], firstName: "", lastName: "", email: "" },
       selectedResourceID: null,
-      selectedResourceData: null
+      selectedResourceData: null,
+      consoleOutput: []
     };
   }
 
@@ -87,7 +94,8 @@ export default class WorkflowDemoApp extends React.Component<
         dataLoader,
         systemError: null,
         systemDefinition: JSON.stringify(parsed, null, 2),
-        selectedResourceID: null
+        selectedResourceID: null,
+        consoleOutput: []
       });
     } catch (e) {
       this.setState({ systemError: e.toString() });
@@ -118,8 +126,8 @@ export default class WorkflowDemoApp extends React.Component<
         ...this.state.selectedResourceID,
         asUser: this.state.user
       });
-      if (selectedResourceData) {
-        this.setState({ selectedResourceData });
+      if (selectedResourceData.resource) {
+        this.setState({ selectedResourceData: selectedResourceData.resource });
       } else {
         console.error("Cannot find resource", this.state.selectedResourceID);
       }
@@ -135,6 +143,15 @@ export default class WorkflowDemoApp extends React.Component<
     }
 
     this.setState({ resourceList });
+  };
+
+  logErrors = (errors: string[]) => {
+    const errorObjects = errors.map(
+      e => ({ type: "error", text: e } as ConsoleMessage)
+    );
+    this.setState({
+      consoleOutput: [...this.state.consoleOutput, ...errorObjects]
+    });
   };
 
   selectResource = (id: ResourceID) => {
@@ -176,7 +193,27 @@ export default class WorkflowDemoApp extends React.Component<
               user={this.state.user}
               engine={this.state.engine}
               resource={this.state.selectedResourceData}
+              onUpdate={this.refetchData}
+              onError={this.logErrors}
             />
+          </div>
+          <div className={styles.consoleView}>
+            {this.state.consoleOutput
+              .slice()
+              .reverse()
+              .map(e => (
+                <div
+                  className={[
+                    styles.consoleLine,
+                    e.type === "error"
+                      ? styles.consoleError
+                      : styles.consoleDebug
+                  ].join(" ")}
+                >
+                  <div className={styles.consoleLineIndicator}>></div>
+                  <div className={styles.consoleLineText}>{e.text}</div>
+                </div>
+              ))}
           </div>
         </div>
         <div className={styles.rightPanel}>

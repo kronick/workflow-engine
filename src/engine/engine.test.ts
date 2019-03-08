@@ -1,16 +1,13 @@
 import { SystemDefinition, User } from "../types";
 import { FakeInMemoryDataLoader } from "../dataLoader/index";
-import PGBusinessEngine, {
-  UnknownResource,
-  DescribeTransitionsResult
-} from "./";
+import PGBusinessEngine, { DescribeTransitionsResult } from "./";
 
 const simpleSystem: SystemDefinition = {
   name: "Simple system",
   roles: ["regular", "admin"],
   resources: {
     Switch: {
-      states: ["off", "on", "turbo"],
+      states: ["off", "on", "turbo", "impossible"],
       properties: {
         maxVoltage: {
           type: "number",
@@ -49,6 +46,12 @@ const simpleSystem: SystemDefinition = {
             { roles: ["admin"], conditions: ["allow"] },
             { denyWithMessage: "Only admins can turn the switch to turbo." }
           ]
+        },
+        turnToImpossible: {
+          from: ["off", "on", "turbo"],
+          to: "impossible",
+          conditions: [{ denyWithMessage: "This action is never possible." }],
+          permissions: ["allow"]
         }
       }
     }
@@ -102,13 +105,32 @@ describe("Business engine", () => {
         regularUser
       } = await createSimpleSystem();
 
-      const readResult: UnknownResource | undefined = await engine.getResource({
+      const readResult = await engine.getResource({
         ...resource,
         asUser: regularUser
       });
 
-      expect(readResult!.state).toBe("off");
-      expect(readResult!.maxVoltage).toBeDefined();
+      expect(readResult.resource!.state).toBe("off");
+      expect(readResult.resource!.maxVoltage.value).toBeDefined();
+      expect(readResult.resource!.maxVoltage.errors).toEqual([]);
+    });
+
+    it("Returns error when getting invalid resource", async () => {
+      const {
+        engine,
+        resource,
+        adminUser,
+        regularUser
+      } = await createSimpleSystem();
+
+      const readResult = await engine.getResource({
+        uid: "bogus",
+        type: "bad",
+        asUser: regularUser
+      });
+
+      expect(readResult.resource).toBeUndefined();
+      expect(readResult.errors.length).toBeGreaterThan(0);
     });
 
     it("Enforces property-level read permissions", async () => {
@@ -119,27 +141,26 @@ describe("Business engine", () => {
         regularUser
       } = await createSimpleSystem();
 
-      const regularResult:
-        | UnknownResource
-        | undefined = await engine.getResource({
+      const regularResult = await engine.getResource({
         ...resource,
         asUser: regularUser
       });
 
-      const adminResult: UnknownResource | undefined = await engine.getResource(
-        {
-          ...resource,
-          asUser: adminUser
-        }
-      );
+      const adminResult = await engine.getResource({
+        ...resource,
+        asUser: adminUser
+      });
 
       // Regular user can't see password
-      expect(regularResult!.maxVoltage).toBeDefined();
-      expect(regularResult!.password).toBeUndefined();
+      expect(regularResult.resource!.maxVoltage.value).toBeDefined();
+      expect(regularResult.resource!.password.value).toBeUndefined();
+      expect(regularResult.resource!.password.errors.length).toBeGreaterThan(0);
 
       // Admin user can see passworrd
-      expect(adminResult!.maxVoltage).toBeDefined();
-      expect(adminResult!.password).toBeDefined();
+      expect(adminResult.resource!.maxVoltage.value).toBeDefined();
+      expect(adminResult.resource!.password.value).toBeDefined();
+      expect(adminResult.resource!.password.errors.length).toBe(0);
+      expect(adminResult.resource!.maxVoltage.errors.length).toBe(0);
     });
   });
 
@@ -200,6 +221,133 @@ describe("Business engine", () => {
       ).toBeTruthy();
     });
 
-    // it.skip("Can ");
+    it("performs valid action", async () => {
+      const {
+        engine,
+        resource,
+        adminUser,
+        regularUser
+      } = await createSimpleSystem();
+
+      const result = await engine.performAction({
+        uid: resource.uid,
+        type: resource.type,
+        asUser: adminUser,
+        action: "turnOn"
+      });
+
+      expect(result.success).toBe(true);
+
+      const readResult = await engine.getResource({
+        ...resource,
+        asUser: regularUser
+      });
+
+      expect(readResult.resource!.state).toBe("on");
+    });
+
+    it("returns error on invalid action", async () => {
+      const {
+        engine,
+        resource,
+        adminUser,
+        regularUser
+      } = await createSimpleSystem();
+
+      const result = await engine.performAction({
+        uid: resource.uid,
+        type: resource.type,
+        asUser: adminUser,
+        action: "invalid"
+      });
+
+      expect(result.success).toBe(false);
+      // Should have errors
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it("returns error on not allowed action", async () => {
+      const {
+        engine,
+        resource,
+        adminUser,
+        regularUser
+      } = await createSimpleSystem();
+
+      // A regular user is not allowed to turn the switch to turbo
+      const result = await engine.performAction({
+        uid: resource.uid,
+        type: resource.type,
+        asUser: regularUser,
+        action: "turnOnTurbo"
+      });
+
+      expect(result.success).toBe(false);
+      // Should have errors
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it("returns error on not possible action", async () => {
+      const {
+        engine,
+        resource,
+        adminUser,
+        regularUser
+      } = await createSimpleSystem();
+
+      // This action is never possible
+      const result = await engine.performAction({
+        uid: resource.uid,
+        type: resource.type,
+        asUser: adminUser,
+        action: "turnToImpossible"
+      });
+
+      expect(result.success).toBe(false);
+      // Should have errors
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it("returns error when performing action on invalid resource type", async () => {
+      const {
+        engine,
+        resource,
+        adminUser,
+        regularUser
+      } = await createSimpleSystem();
+
+      // This action is never possible
+      const result = await engine.performAction({
+        uid: resource.uid,
+        type: "bogus",
+        asUser: adminUser,
+        action: "turnOn"
+      });
+
+      expect(result.success).toBe(false);
+      // Should have errors
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it("returns error when performing action on invalid resource", async () => {
+      const {
+        engine,
+        resource,
+        adminUser,
+        regularUser
+      } = await createSimpleSystem();
+
+      // This action is never possible
+      const result = await engine.performAction({
+        uid: "bogus",
+        type: resource.type,
+        asUser: adminUser,
+        action: "turnOn"
+      });
+
+      expect(result.success).toBe(false);
+      // Should have errors
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
   });
 });

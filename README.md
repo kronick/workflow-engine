@@ -5,9 +5,9 @@
 - [ ] Derive calculated fields
 - [ ] Demo frontend (run engine client-side)
 - [ ] References between resources
-- [ ] Action definition
+- [ ] Action definition (transintions without exit state?)
 - [ ] Expression standard library
-- [ ] Custom functions in system definition
+- [ ] Custom functions in system definition -> expression context
 - [ ] User objects in expressions
 - [ ] updateResource
 - [ ] Input objects to transitions &
@@ -21,10 +21,13 @@
 - [ ] Consistent exception handling
 - [ ] Cache & transaction control for data loader API
 - [ ] SQL data loader
-- [ ] Cleaner object validation
+- [ ] Cleaner internal object validation
 - [ ] Expression language docs
 - [ ] Deletion rules (cascade, conditions)
 - [ ] Service layer generator (REST & GraphQL)
+- [ ] Expression test runner
+- [ ] Automatic role assignment (ball-in-court if a condition is met, etc)
+- [ ] Visibility control (allow / deny / hide ?) for properties and objects
 
 ## Usage
 

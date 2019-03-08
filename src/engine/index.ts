@@ -10,12 +10,10 @@ export interface RawUnknownResource {
   [property: string]: unknown;
   state: string;
 }
-export interface UnknownResource {
-  [property: string]: unknown;
-  state: string;
-  uid: string;
-  type: string;
-}
+export type UnknownResource = {
+  [property: string]: GetPropertyResult<unknown>;
+} & { state: string; uid: string; type: string };
+
 interface GetResourceParams {
   /** Unique identifier of the resource being requested.  */
   uid: string;
@@ -33,6 +31,22 @@ interface GetResourceParams {
    */
   includeProperties?: string[];
 }
+type GetResourceResult = Result<UnknownResource, "resource">;
+type GetPropertyResult<T> = Result<T, "value">;
+
+/** Generic type to represent a request result.
+ *  Allows for two keys: `errors` (required) and a dynamically-named `TDataKey`
+ *  key (defaults to "data").
+ *
+ *  A successful result will have data in the `TDataKey` key and an empty
+ *  `errors` array. An unsuccessful result will have error strings in the
+ *  `errors` array and a `TDataKey` value of `undefined`.
+ */
+export type Result<TData, TDataKey extends string = "data"> = {
+  [key in TDataKey]: TData | undefined
+} & {
+  errors: string[];
+};
 
 interface DescribeTransitionsParams {
   uid: string;
@@ -85,14 +99,25 @@ interface CanPerformTransitionParams {
   asUser: User;
   transition: string;
 }
+
+export interface PerformActionParams {
+  uid: string;
+  type: string;
+  action: string;
+  asUser: User;
+  input?: unknown;
+}
+
+export type PerformActionResult = Result<boolean, "success">;
+
 interface BusinessEngine {
   /** Get a resource's data including calculated properties.
    *  Will exclude any fields that the requesting user is not permitted to view
    */
-  getResource(params: GetResourceParams): Promise<UnknownResource | undefined>;
+  getResource(params: GetResourceParams): Promise<GetResourceResult>;
 
   /** Update data for a resource. */
-  updateResource(params: UpdateResourceParams): Promise<UnknownResource>;
+  updateResource(params: UpdateResourceParams): Promise<GetResourceResult>;
   // TODO: Other CRUD methods
   // createResource(params: CreateResourceParams): Promise<UnknownResource>;
   // deleteResource(params: DeleteResourceParams): Promise<UnknownResource>;
@@ -117,6 +142,9 @@ interface BusinessEngine {
   listResources(
     params: ListResourceParams
   ): Promise<Array<{ uid: string; type: string }>>;
+
+  /** Perform a named action on a resource */
+  performAction(params: PerformActionParams): Promise<PerformActionResult>;
 }
 export default class PGBusinessEngine implements BusinessEngine {
   system: SystemDefinition;
@@ -143,14 +171,22 @@ export default class PGBusinessEngine implements BusinessEngine {
     // TODO: Derive calculated fields
 
     if (!rawResult) {
-      return undefined;
+      return { resource: undefined, errors: ["Resource not found."] };
     }
 
     // Enforce per-field read permissions
-    const visibleResult: RawUnknownResource = { state: rawResult.state };
+    const visibleResult = {
+      state: rawResult.state,
+      uid,
+      type
+    } as UnknownResource;
+
     // TODO: This needs to be updated to work with calculated properties
     const resourceDef = this.system.resources[type];
     for (const property in rawResult) {
+      // Special case for `state` — don't enforce read permissions
+      if (property === "state") continue;
+
       if (
         resourceDef.properties &&
         resourceDef.properties[property] &&
@@ -160,15 +196,25 @@ export default class PGBusinessEngine implements BusinessEngine {
         const ctx = { self: rawResult };
         const result = evaluatePermissions(perms!, asUser, stdlibCtx(ctx));
         if (result.decision === "allow") {
-          visibleResult[property] = rawResult[property];
+          visibleResult[property] = { value: rawResult[property], errors: [] };
+        } else {
+          visibleResult[property] = {
+            value: undefined,
+            errors: [result.reason || "Access denied."]
+          };
         }
       } else {
-        visibleResult[property] = rawResult[property];
+        // No read permissions specified means we should allow read access
+        // by default.
+        visibleResult[property] = { value: rawResult[property], errors: [] };
       }
     }
 
     // TODO: Validate data against system definition before returning
-    return { ...visibleResult, uid, type };
+    return {
+      resource: visibleResult,
+      errors: []
+    };
   }
 
   async updateResource({ uid, type, asUser, data }: UpdateResourceParams) {
@@ -180,8 +226,13 @@ export default class PGBusinessEngine implements BusinessEngine {
     //  have permission to read
     const rawResult = await this.dataLoader.read(uid, type);
 
-    // TODO: omit fields the user does not have permission to read
-    return { ...(rawResult as RawUnknownResource), uid, type };
+    if (!rawResult) {
+      return { resource: undefined, errors: ["Resource not found."] };
+    }
+
+    // TODO: Don't re-fetch after update. Although if the data loader caches
+    //  data this shouldn't make a difference.
+    return await this.getResource({ uid, type, asUser });
   }
 
   async describeTransitions({
@@ -204,7 +255,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       const transition = allTransitions[t];
       if (transition.from.includes(resource.state)) {
         // Figure out if this transition is possible and/or allowed
-        const { possible, allowed } = this.evaluateTransitionPermissions(
+        const { possible, allowed } = this._evaluateTransitionPermissions(
           transition,
           resource,
           asUser
@@ -223,7 +274,7 @@ export default class PGBusinessEngine implements BusinessEngine {
     return result;
   }
 
-  evaluateTransitionPermissions(
+  _evaluateTransitionPermissions(
     transition: TransitionDefinition,
     resource: RawUnknownResource,
     asUser: User
@@ -277,12 +328,55 @@ export default class PGBusinessEngine implements BusinessEngine {
       return false;
     }
 
-    const { allowed } = this.evaluateTransitionPermissions(
+    const { allowed } = this._evaluateTransitionPermissions(
       allTransitions[transition],
       resource,
       asUser
     );
 
     return allowed.decision === "allow";
+  }
+
+  async performAction({
+    uid,
+    type,
+    asUser,
+    action,
+    input
+  }: PerformActionParams) {
+    // Gather required data to check if this action is possible.
+    const resourceDef = this.system.resources[type];
+    if (!resourceDef) {
+      return { success: false, errors: [`Resource not found.`] };
+    }
+
+    const allActions = resourceDef.transitions;
+    if (!allActions || allActions[action] === undefined) {
+      return { success: false, errors: [`Invalid action: \`${action}\`.`] };
+    }
+    const actionDef = allActions[action];
+
+    const rawResult = await this.dataLoader.read(uid, type);
+    if (!rawResult) {
+      return { success: false, errors: [`Resource not found.`] };
+    }
+
+    const { allowed } = this._evaluateTransitionPermissions(
+      actionDef,
+      rawResult,
+      asUser
+    );
+
+    if (allowed.decision === "allow") {
+      // The action is allowed. Perform the action.
+      // TODO: Add in handling of other action effects (i.e. sending e-mails,
+      //  updating other data, etc)
+      const toState = actionDef.to;
+      this.dataLoader.update(uid, type, { state: toState });
+
+      return { success: true, errors: [] };
+    } else {
+      return { success: false, errors: [allowed.reason || "Access denied."] };
+    }
   }
 }

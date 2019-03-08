@@ -55,6 +55,10 @@
 
 .actionButton {
   font-size: 14pt;
+  cursor: pointer;
+}
+.actionButton.disabled {
+  opacity: 0.5;
 }
 
 .actionReason {

@@ -12,6 +12,8 @@ interface ResourceDetailProps {
   resource: ResourceData | null;
   engine: PGBusinessEngine;
   user: User | null;
+  onUpdate: () => void;
+  onError: (errors: string[]) => void;
 }
 
 interface ResourceDetailState {
@@ -57,6 +59,29 @@ export default class ResourceDetail extends React.Component<
     this.setState({ stateTransitions: result });
   };
 
+  handleAction = async (action: string) => {
+    if (this.props.resource && this.props.user) {
+      const result = await this.props.engine.performAction({
+        uid: this.props.resource.uid,
+        type: this.props.resource.type,
+        asUser: this.props.user,
+        action
+      });
+
+      if (!result.success) {
+        this.props.onError(result.errors);
+      }
+      this.props.onUpdate();
+    } else {
+      console.error(
+        "Tried to perform action with no resource or user specified.",
+        action,
+        this.props.resource,
+        this.props.user
+      );
+    }
+  };
+
   render() {
     const resource = this.props.resource;
     if (!resource) {
@@ -87,7 +112,7 @@ export default class ResourceDetail extends React.Component<
               <PropertyDetail
                 key={"state"}
                 name={"state"}
-                value={resource["state"]}
+                value={{ value: resource["state"], errors: [] }}
                 type={"string"}
                 readonly
               />
@@ -95,7 +120,7 @@ export default class ResourceDetail extends React.Component<
 
             {this.state.stateTransitions
               ? this.state.stateTransitions.map(t => (
-                  <ActionDetail onAction={() => null} action={t} />
+                  <ActionDetail onAction={this.handleAction} action={t} />
                 ))
               : null}
           </tbody>
@@ -107,7 +132,7 @@ export default class ResourceDetail extends React.Component<
 
 const PropertyDetail: React.SFC<{
   name: string;
-  value: unknown;
+  value: { value: unknown; errors: string[] };
   type: PropertyTypeDefinition;
   readonly?: boolean;
 }> = props => {
@@ -115,13 +140,15 @@ const PropertyDetail: React.SFC<{
     <tr key={props.name} className={styles.propertyRow}>
       <td className={styles.propertyName}>{props.name}</td>
 
-      {props.value !== undefined ? (
+      {props.value.value !== undefined ? (
         <td className={styles.propertyValue}>
           <PropertyEditor {...props} />
         </td>
       ) : (
         <td className={`${styles.propertyValue} ${styles.undefinedValue}`}>
-          undefined
+          {props.value.errors.length
+            ? props.value.errors.map(e => <div>{e}</div>)
+            : "undefined"}
         </td>
       )}
     </tr>
@@ -130,24 +157,24 @@ const PropertyDetail: React.SFC<{
 
 const PropertyEditor: React.SFC<{
   name: string;
-  value: unknown;
+  value: { value: unknown; errors: string[] };
   type: PropertyTypeDefinition;
   readonly?: boolean;
 }> = props => {
   switch (props.type) {
     case "boolean":
-      return <input type="checkbox" checked={props.value as boolean} />;
+      return <input type="checkbox" checked={props.value.value as boolean} />;
     case "number":
-      return <input type="number" value={String(props.value)} />;
+      return <input type="number" value={String(props.value.value)} />;
     case "string":
     default:
       if (props.readonly) {
-        return <div>{props.value as string}</div>;
+        return <div>{props.value.value as string}</div>;
       }
       if (props.name === "text") {
-        return <textarea value={props.value as string} />;
+        return <textarea value={props.value.value as string} />;
       } else {
-        return <input type="text" value={props.value as string} />;
+        return <input type="text" value={props.value.value as string} />;
       }
   }
 };
@@ -173,14 +200,13 @@ const ActionDetail: React.SFC<{
 
   return (
     <tr>
-      <td
-        className={disabled ? styles.actionName : styles.actionRow}
-        colSpan={disabled ? 1 : 2}
-      >
+      <td className={styles.actionName}>
         <button
           onClick={() => props.onAction(props.action.action, null)}
-          className={styles.actionButton}
-          disabled={disabled}
+          className={[
+            styles.actionButton,
+            disabled ? styles.disabled : undefined
+          ].join(" ")}
         >
           {props.action.action}
         </button>{" "}
