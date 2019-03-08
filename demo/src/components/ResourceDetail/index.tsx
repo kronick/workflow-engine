@@ -9,7 +9,7 @@ import { PropertyTypeDefinition, User } from "pg-workflow-engine/dist/types";
 import styles from "./ResourceDetail.module.css";
 
 interface ResourceDetailProps {
-  resource: ResourceData | null;
+  resource?: ResourceData | null;
   engine: PGBusinessEngine;
   user: User | null;
   onUpdate: () => void;
@@ -17,8 +17,9 @@ interface ResourceDetailProps {
 }
 
 interface ResourceDetailState {
-  editedResource: ResourceData | null;
+  editedResource?: ResourceData | null;
   stateTransitions: DescribeTransitionsResult | null;
+  hasError?: boolean;
 }
 
 export default class ResourceDetail extends React.Component<
@@ -84,12 +85,19 @@ export default class ResourceDetail extends React.Component<
 
   render() {
     const resource = this.props.resource;
-    if (!resource) {
+    if (resource === undefined) {
+      return "Resource not found.";
+    }
+    if (resource === null) {
       return "No resource selected.";
     }
 
     const system = this.props.engine.system;
     const type = resource.type;
+    const typeDef = system.resources[type];
+    if (!typeDef) {
+      return "Error";
+    }
     const properties = system.resources[type].properties;
 
     if (!properties) {

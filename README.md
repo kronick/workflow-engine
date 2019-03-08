@@ -3,10 +3,10 @@
 ## TODO:
 
 - [ ] Derive calculated fields
-- [ ] Demo frontend (run engine client-side)
+- [x] Demo frontend (run engine client-side)
 - [ ] References between resources
 - [ ] Action definition (transintions without exit state?)
-- [ ] Expression standard library
+- [x] Expression standard library
 - [ ] Custom functions in system definition -> expression context
 - [ ] User objects in expressions
 - [ ] updateResource
@@ -16,7 +16,8 @@
 - [ ] Automatic audit history log
 - [ ] i18n?
 - [ ] E-mails and other side effects in actions
-- [ ] Per-resource read/write permissions
+- [x] Per-resource read permissions
+- [ ] Per-resource write permissions
 - [ ] Decide if expressions need to be async
 - [ ] Consistent exception handling
 - [ ] Cache & transaction control for data loader API

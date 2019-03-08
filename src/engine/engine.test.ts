@@ -4,10 +4,11 @@ import PGBusinessEngine, { DescribeTransitionsResult } from "./";
 
 const simpleSystem: SystemDefinition = {
   name: "Simple system",
-  roles: ["regular", "admin"],
+  roles: ["regular", "admin", "anonymous"],
   resources: {
     Switch: {
       states: ["off", "on", "turbo", "impossible"],
+      readPermissions: [{ roles: ["regular", "admin"], conditions: ["allow"] }],
       properties: {
         maxVoltage: {
           type: "number",
@@ -71,25 +72,54 @@ async function createSimpleSystem(n: number = 1) {
     email: "admin@example.com"
   };
   const regularUser: User = {
-    uid: "a",
+    uid: "b",
     firstName: "Regular",
     lastName: "User",
     roles: ["regular"],
     email: "user@example.com"
   };
-  return { engine, resource: resource[0], adminUser, regularUser };
+
+  const anonymousUser: User = {
+    uid: "c",
+    firstName: "Anonymous",
+    lastName: "User",
+    roles: ["anonymous"],
+    email: "anonymous@example.com"
+  };
+  return {
+    engine,
+    resource: resource[0],
+    adminUser,
+    regularUser,
+    anonymousUser
+  };
 }
 
-describe("Business engine", () => {
+describe("Business engine", async () => {
+  let engine: PGBusinessEngine,
+    resource: { uid: string; type: string },
+    adminUser: User,
+    regularUser: User,
+    anonymousUser: User;
+
+  // Build a fresh environment before each test
+  beforeEach(async () => {
+    const system = await createSimpleSystem();
+    engine = system.engine;
+    resource = system.resource;
+    adminUser = system.adminUser;
+    regularUser = system.regularUser;
+    anonymousUser = system.anonymousUser;
+  });
+
   describe("Listing", () => {
     it("can list resource types", async () => {
-      const { engine } = await createSimpleSystem();
       expect(engine.listResourceTypes()).toEqual(["Switch"]);
     });
 
     it("can list resources of a given type", async () => {
       const { engine, adminUser } = await createSimpleSystem(5);
-      const resources = await await engine.listResources({
+      const resources = await engine.listResources({
         type: "Switch",
         asUser: adminUser
       });
@@ -98,13 +128,6 @@ describe("Business engine", () => {
   });
   describe("Performs CRUD operations", () => {
     it("Can read a resource", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       const readResult = await engine.getResource({
         ...resource,
         asUser: regularUser
@@ -116,13 +139,6 @@ describe("Business engine", () => {
     });
 
     it("Returns error when getting invalid resource", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       const readResult = await engine.getResource({
         uid: "bogus",
         type: "bad",
@@ -133,14 +149,17 @@ describe("Business engine", () => {
       expect(readResult.errors.length).toBeGreaterThan(0);
     });
 
-    it("Enforces property-level read permissions", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
+    it("Enforces resource-level read permissions", async () => {
+      const result = await engine.getResource({
+        ...resource,
+        asUser: anonymousUser
+      });
 
+      expect(result.resource).toBeUndefined();
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it("Enforces property-level read permissions", async () => {
       const regularResult = await engine.getResource({
         ...resource,
         asUser: regularUser
@@ -171,13 +190,6 @@ describe("Business engine", () => {
     ) => actionResults.some(t => t.action === to);
 
     it("Can describe the available transitions", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       const transitions = await engine.describeTransitions({
         ...resource,
         asUser: regularUser
@@ -188,13 +200,6 @@ describe("Business engine", () => {
     });
 
     it("Enforces permissions on state transitions", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       const transitionsForRegular = await engine.describeTransitions({
         ...resource,
         asUser: regularUser
@@ -222,13 +227,6 @@ describe("Business engine", () => {
     });
 
     it("performs valid action", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       const result = await engine.performAction({
         uid: resource.uid,
         type: resource.type,
@@ -247,13 +245,6 @@ describe("Business engine", () => {
     });
 
     it("returns error on invalid action", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       const result = await engine.performAction({
         uid: resource.uid,
         type: resource.type,
@@ -267,13 +258,6 @@ describe("Business engine", () => {
     });
 
     it("returns error on not allowed action", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       // A regular user is not allowed to turn the switch to turbo
       const result = await engine.performAction({
         uid: resource.uid,
@@ -288,13 +272,6 @@ describe("Business engine", () => {
     });
 
     it("returns error on not possible action", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       // This action is never possible
       const result = await engine.performAction({
         uid: resource.uid,
@@ -309,13 +286,6 @@ describe("Business engine", () => {
     });
 
     it("returns error when performing action on invalid resource type", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       // This action is never possible
       const result = await engine.performAction({
         uid: resource.uid,
@@ -330,13 +300,6 @@ describe("Business engine", () => {
     });
 
     it("returns error when performing action on invalid resource", async () => {
-      const {
-        engine,
-        resource,
-        adminUser,
-        regularUser
-      } = await createSimpleSystem();
-
       // This action is never possible
       const result = await engine.performAction({
         uid: "bogus",

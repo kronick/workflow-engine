@@ -30,7 +30,7 @@ interface WorkflowDemoAppState {
   user: User;
 
   selectedResourceID: ResourceID | null;
-  selectedResourceData: ResourceData | null;
+  selectedResourceData?: ResourceData | null;
 
   consoleOutput: ConsoleMessage[];
 }
@@ -126,10 +126,10 @@ export default class WorkflowDemoApp extends React.Component<
         ...this.state.selectedResourceID,
         asUser: this.state.user
       });
-      if (selectedResourceData.resource) {
-        this.setState({ selectedResourceData: selectedResourceData.resource });
-      } else {
-        console.error("Cannot find resource", this.state.selectedResourceID);
+
+      this.setState({ selectedResourceData: selectedResourceData.resource });
+      if (selectedResourceData.errors) {
+        this.logErrors(selectedResourceData.errors);
       }
     } else {
       try {

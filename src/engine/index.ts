@@ -146,6 +146,15 @@ interface BusinessEngine {
   /** Perform a named action on a resource */
   performAction(params: PerformActionParams): Promise<PerformActionResult>;
 }
+
+const RESOURCE_NOT_FOUND = {
+  resource: undefined,
+  errors: ["Resource not found."]
+};
+const RESOURCE_ACCESS_DENIED = {
+  resource: undefined,
+  errors: ["Access denied."]
+};
 export default class PGBusinessEngine implements BusinessEngine {
   system: SystemDefinition;
   dataLoader: DataLoader;
@@ -171,7 +180,28 @@ export default class PGBusinessEngine implements BusinessEngine {
     // TODO: Derive calculated fields
 
     if (!rawResult) {
-      return { resource: undefined, errors: ["Resource not found."] };
+      return RESOURCE_NOT_FOUND;
+    }
+
+    const ctx = stdlibCtx({ self: rawResult });
+
+    const resourceDef = this.system.resources[type];
+
+    if (!resourceDef) {
+      return RESOURCE_NOT_FOUND;
+    }
+
+    // Enforce resource-level read permissions
+    const permissions = this.system.resources[type].readPermissions;
+    if (permissions) {
+      const result = evaluatePermissions(permissions, asUser, ctx);
+      if (result.decision === "deny") {
+        this._evaluateTransitionPermissions;
+        if (result.reason) {
+          return { resource: undefined, errors: [result.reason] };
+        }
+        return RESOURCE_ACCESS_DENIED;
+      }
     }
 
     // Enforce per-field read permissions
@@ -182,7 +212,6 @@ export default class PGBusinessEngine implements BusinessEngine {
     } as UnknownResource;
 
     // TODO: This needs to be updated to work with calculated properties
-    const resourceDef = this.system.resources[type];
     for (const property in rawResult) {
       // Special case for `state` — don't enforce read permissions
       if (property === "state") continue;
@@ -193,8 +222,7 @@ export default class PGBusinessEngine implements BusinessEngine {
         resourceDef.properties[property].readPermissions
       ) {
         const perms = resourceDef.properties[property].readPermissions;
-        const ctx = { self: rawResult };
-        const result = evaluatePermissions(perms!, asUser, stdlibCtx(ctx));
+        const result = evaluatePermissions(perms!, asUser, ctx);
         if (result.decision === "allow") {
           visibleResult[property] = { value: rawResult[property], errors: [] };
         } else {
@@ -227,7 +255,7 @@ export default class PGBusinessEngine implements BusinessEngine {
     const rawResult = await this.dataLoader.read(uid, type);
 
     if (!rawResult) {
-      return { resource: undefined, errors: ["Resource not found."] };
+      return RESOURCE_NOT_FOUND;
     }
 
     // TODO: Don't re-fetch after update. Although if the data loader caches

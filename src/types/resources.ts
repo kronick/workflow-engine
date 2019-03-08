@@ -61,9 +61,7 @@ export interface ResourceDefinition {
     [transition: string]: TransitionDefinition;
   };
 
-  readPermissions?: {
-    [property: string]: PermissionDefinition;
-  };
+  readPermissions?: PermissionDefinition;
 
   actionPermissions?: {
     [action: string]: PermissionDefinition;

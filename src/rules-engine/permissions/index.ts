@@ -83,7 +83,7 @@ export default function evaluatePermissions(
       return evaluateConditions(d.conditions, { ...ctx, user });
     }
   }
-  return { decision: "deny", reason: "Not allowed for this user." };
+  return { decision: "deny", reason: "Access denied." };
 }
 
 // Helpers that provide us with Typescript user-defined type guards
