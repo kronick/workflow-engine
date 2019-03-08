@@ -10,3 +10,10 @@ yarn link
 cd demo
 yarn link pg-workflow engine
 ```
+
+And then run the development server with
+
+```
+yarn install
+yarn start
+```

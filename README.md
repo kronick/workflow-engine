@@ -3,7 +3,7 @@
 ## TODO:
 
 - [ ] Derive calculated fields
-- [x] Demo frontend (run engine client-side)
+- [x] [Demo frontend](demo/README.md) (run engine client-side)
 - [ ] References between resources
 - [ ] Action definition (transintions without exit state?)
 - [x] Expression standard library
@@ -14,11 +14,10 @@
       actions
 - [ ] Input validation on updates, transitions, actions
 - [ ] Automatic audit history log
-- [ ] i18n?
+- [ ] i18n strings (for error messages or otherwise)
 - [ ] E-mails and other side effects in actions
 - [x] Per-resource read permissions
-- [ ] Per-resource write permissions
-- [ ] Decide if expressions need to be async
+- [ ] Decide if expressions need to be async (for loading references)
 - [ ] Consistent exception handling
 - [ ] Cache & transaction control for data loader API
 - [ ] SQL data loader
@@ -28,7 +27,7 @@
 - [ ] Service layer generator (REST & GraphQL)
 - [ ] Expression test runner
 - [ ] Automatic role assignment (ball-in-court if a condition is met, etc)
-- [ ] Visibility control (allow / deny / hide ?) for properties and objects
+- [ ] Visibility control (allow / deny / _hide_ ?) for properties and objects
 
 ## Usage
 
@@ -45,6 +44,10 @@
   ```
   yarn test:live
   ```
+- Run only one set of tests by specifying its filename i.e.:
+  ```
+  yarn test:live expressions.test.ts
+  ```
 - Run the script in `index.ts` with
   ```
   yarn start
@@ -53,3 +56,49 @@
   ```
   yarn build:live
   ```
+
+### Input validation
+
+Something like this?
+
+```
+{
+  "editDocument": {
+    "from": [
+      "authoring",
+      "revising"
+    ],
+    "input": {
+      "title": {
+        "type": "string",
+        "constraints": [
+          { "minLength": 1 },
+          { "regex": "*." }
+        ]
+      },
+      "text": {
+        "type": "string"
+      }
+    },
+    "validation": [
+      {
+        "reportOnField": "text",
+        "invalidIf": {
+          ">": [
+            {
+              "stringLength": {
+                "getInput": "title"
+              }
+            },
+            {
+              "stringLength": {
+                "getInput": "text"
+              }
+            }
+          ]
+        },
+        "invalidMessage": "Document text must be longer than the title."
+      }
+    ]
+  }
+```
