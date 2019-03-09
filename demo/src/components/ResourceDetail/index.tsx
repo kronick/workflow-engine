@@ -99,6 +99,8 @@ export default class ResourceDetail extends React.Component<
       return "Error";
     }
     const properties = system.resources[type].properties;
+    const calculatedProperties =
+      system.resources[type].calculatedProperties || {};
 
     if (!properties) {
       return "No properties.";
@@ -114,6 +116,14 @@ export default class ResourceDetail extends React.Component<
                 name={p}
                 value={resource[p]}
                 type={properties[p].type}
+              />
+            ))}
+            {Object.keys(calculatedProperties).map(p => (
+              <PropertyDetail
+                key={p}
+                name={p}
+                value={resource[p]}
+                type={calculatedProperties[p].type}
               />
             ))}
             {resource.state !== undefined ? (
@@ -150,7 +160,8 @@ const PropertyDetail: React.SFC<{
 
       {props.value.value !== undefined ? (
         <td className={styles.propertyValue}>
-          <PropertyEditor {...props} />
+          {props.value.value}
+          {/* <PropertyEditor {...props} /> */}
         </td>
       ) : (
         <td className={`${styles.propertyValue} ${styles.undefinedValue}`}>

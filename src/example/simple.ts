@@ -176,6 +176,13 @@ export const simpleDefinition: SystemDefinition = {
         }
       },
 
+      calculatedProperties: {
+        textLength: {
+          type: "number",
+          expression: { stringLength: { get: "text" } }
+        }
+      },
+
       transitions: {
         archive: {
           from: ["authoring", "reviewing", "revising", "approved"],

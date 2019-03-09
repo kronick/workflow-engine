@@ -1,7 +1,7 @@
 import { SystemDefinition, ResourceDefinition } from "../types/";
 import faker from "faker";
 
-interface UnknownResource {
+export interface UnknownResourceData {
   [property: string]: unknown;
   state: string;
 }
@@ -11,7 +11,7 @@ export interface DataLoader {
     type: string,
     data: Object
   ): Promise<{ uid: string; type: string; data: Object }>;
-  read(uid: string, type: string): Promise<UnknownResource | undefined>;
+  read(uid: string, type: string): Promise<UnknownResourceData | undefined>;
   update(uid: string, type: string, data: Object): Promise<boolean>;
   delete(uid: string, type: string, data: Object): Promise<boolean>;
 
@@ -19,7 +19,7 @@ export interface DataLoader {
 }
 
 export class InMemoryDataLoader implements DataLoader {
-  data: Map<string, UnknownResource> = new Map();
+  data: Map<string, UnknownResourceData> = new Map();
   last_uid = 0;
 
   definition: SystemDefinition | null = null;
@@ -117,7 +117,7 @@ export class FakeInMemoryDataLoader extends InMemoryDataLoader {
   }
 
   static generateFakeData(resource: ResourceDefinition) {
-    const out: UnknownResource = {
+    const out: UnknownResourceData = {
       state:
         resource.defaultState || (resource.states ? resource.states[0] : "")
     };

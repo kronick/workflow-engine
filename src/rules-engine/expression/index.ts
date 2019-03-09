@@ -148,6 +148,31 @@ const operatorMap: OperatorMap = {
     return ctx.self[property] !== undefined;
   },
 
+  stringLength: (string, ctx) => {
+    return $string(string, ctx).length;
+  },
+
+  /** Join an array of strings with an optional separator */
+  joinStrings: (args, ctx) => {
+    let strings: string[];
+    let separator: string;
+    if (Array.isArray(args)) {
+      // Strings to join are specified in an array
+      strings = args.map(el => $string(el, ctx));
+      separator = "";
+    } else if (args.strings) {
+      // Strings to join are specified in an object
+      strings = $array(args.strings, ctx).map(el => $string(el, ctx));
+      separator = $string(args.separator || "", ctx);
+    } else {
+      // Strings to join must be a string-producing expression
+      strings = $array(args, ctx).map(el => $string(el, ctx));
+      separator = "";
+    }
+
+    return strings.join(separator);
+  },
+
   /** Returns a boolean indicating whether the `needle` object occurs in the
    *  `haystack` array */
   contains: ({ needle, haystack }, ctx) => {
@@ -157,7 +182,7 @@ const operatorMap: OperatorMap = {
       );
     }
 
-    haystack = $array(haystack, ctx);
+    haystack = $array(haystack, ctx).map(el => e(el, ctx));
     needle = e(needle, ctx);
     const firstType = typeof haystack[0];
     if (haystack.some((a: unknown) => typeof a !== firstType)) {

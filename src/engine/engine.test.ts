@@ -31,6 +31,17 @@ const simpleSystem: SystemDefinition = {
           readPermissions: [{ roles: ["admin"], conditions: ["allow"] }, "deny"]
         }
       },
+      calculatedProperties: {
+        passwordLength: {
+          type: "number",
+          expression: { stringLength: { get: "password" } },
+          readPermissions: [{ roles: ["admin"], conditions: ["allow"] }]
+        },
+        secret: {
+          type: "number",
+          expression: { "+": [1, 2] }
+        }
+      },
       transitions: {
         turnOn: {
           from: ["off", "turbo"],
@@ -53,6 +64,20 @@ const simpleSystem: SystemDefinition = {
           to: "impossible",
           conditions: [{ denyWithMessage: "This action is never possible." }],
           permissions: ["allow"]
+        },
+        allowSecretSwitch: {
+          from: ["off"],
+          to: "on",
+          description:
+            "A transition with a condition that depends on a calculated value that should always be allowed.",
+          conditions: [{ allowIf: { "=": [{ get: "secret" }, 3] } }]
+        },
+        denySecretSwitch: {
+          from: ["off"],
+          to: "on",
+          description:
+            "A transition with a condition that depends on a calculated value that should never be allowed.",
+          conditions: [{ allowIf: { "=": [{ get: "secret" }, 0] } }]
         }
       }
     }
@@ -175,11 +200,41 @@ describe("Business engine", async () => {
       expect(regularResult.resource!.password.value).toBeUndefined();
       expect(regularResult.resource!.password.errors.length).toBeGreaterThan(0);
 
-      // Admin user can see passworrd
+      // Admin user can see password
       expect(adminResult.resource!.maxVoltage.value).toBeDefined();
       expect(adminResult.resource!.password.value).toBeDefined();
       expect(adminResult.resource!.password.errors.length).toBe(0);
       expect(adminResult.resource!.maxVoltage.errors.length).toBe(0);
+    });
+  });
+
+  describe("Calculated properties", () => {
+    it("calculates properties", async () => {
+      const readResult = await engine.getResource({
+        ...resource,
+        asUser: adminUser
+      });
+      expect(readResult.resource!.passwordLength.value).toEqual(
+        (readResult.resource!.password.value as string).length
+      );
+    });
+
+    it("Enforces property-level read permissions on calculated properties", async () => {
+      const regularResult = await engine.getResource({
+        ...resource,
+        asUser: regularUser
+      });
+
+      const adminResult = await engine.getResource({
+        ...resource,
+        asUser: adminUser
+      });
+
+      // Regular user can't see password length
+      expect(regularResult.resource!.passwordLength.value).toBeUndefined();
+
+      // Admin user can see password length
+      expect(adminResult.resource!.passwordLength.value).toBeDefined();
     });
   });
 
@@ -224,6 +279,16 @@ describe("Business engine", async () => {
       expect(
         transitionsForAdmin.filter(t => t.action === "turnOnTurbo")[0].allowed
       ).toBeTruthy();
+
+      // Transitions with conditions that depend on calculated properties
+      expect(
+        transitionsForRegular.filter(t => t.action === "allowSecretSwitch")[0]
+          .possible
+      ).toBeTruthy();
+      expect(
+        transitionsForRegular.filter(t => t.action === "denySecretSwitch")[0]
+          .possible
+      ).toBeFalsy();
     });
 
     it("performs valid action", async () => {

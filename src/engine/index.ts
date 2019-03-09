@@ -1,9 +1,10 @@
 import { SystemDefinition, User } from "../types/";
-import { DataLoader } from "../dataLoader";
+import { DataLoader, UnknownResourceData } from "../dataLoader";
 import evaluateConditions from "../rules-engine/conditions";
 import evaluatePermissions from "../rules-engine/permissions";
+import evaluateExpression from "../rules-engine/expression";
 import { ConditionResult } from "../rules-engine/conditions/index";
-import { TransitionDefinition } from "../types/resources";
+import { TransitionDefinition, ResourceDefinition } from "../types/resources";
 import { stdlibCtx } from "../rules-engine/expression/stdlib";
 
 export interface RawUnknownResource {
@@ -175,9 +176,28 @@ export default class PGBusinessEngine implements BusinessEngine {
     return await this.dataLoader.list(params.type);
   }
 
-  async getResource({ uid, type, asUser }: GetResourceParams) {
+  /** Get a resource using the data loader and calculate its calculated
+   *  properties
+   */
+  async _getRawResource({ uid, type, asUser }: GetResourceParams) {
+    const resourceDef = this.system.resources[type];
+    if (!resourceDef) {
+      return undefined;
+    }
+
     const rawResult = await this.dataLoader.read(uid, type);
-    // TODO: Derive calculated fields
+    if (!rawResult) {
+      return undefined;
+    }
+
+    return {
+      ...rawResult,
+      ...this._calculateProperties(resourceDef, rawResult)
+    };
+  }
+
+  async getResource({ uid, type, asUser }: GetResourceParams) {
+    const rawResult = await this._getRawResource({ uid, type, asUser });
 
     if (!rawResult) {
       return RESOURCE_NOT_FOUND;
@@ -216,12 +236,18 @@ export default class PGBusinessEngine implements BusinessEngine {
       // Special case for `state` — don't enforce read permissions
       if (property === "state") continue;
 
-      if (
-        resourceDef.properties &&
-        resourceDef.properties[property] &&
-        resourceDef.properties[property].readPermissions
-      ) {
-        const perms = resourceDef.properties[property].readPermissions;
+      // Figure out whether this is a calculated or regular property
+      const section =
+        resourceDef.properties && resourceDef.properties[property]
+          ? resourceDef.properties
+          : resourceDef.calculatedProperties &&
+            resourceDef.calculatedProperties[property]
+          ? resourceDef.calculatedProperties
+          : undefined;
+      if (!section) continue;
+
+      if (section[property].readPermissions) {
+        const perms = section[property].readPermissions;
         const result = evaluatePermissions(perms!, asUser, ctx);
         if (result.decision === "allow") {
           visibleResult[property] = { value: rawResult[property], errors: [] };
@@ -245,6 +271,31 @@ export default class PGBusinessEngine implements BusinessEngine {
     };
   }
 
+  _calculateProperties(
+    resourceDef: ResourceDefinition,
+    rawResult: UnknownResourceData
+  ): { [key: string]: unknown } {
+    const ctx = stdlibCtx({ self: rawResult });
+
+    if (!resourceDef.calculatedProperties) {
+      return {};
+    }
+
+    const out: { [key: string]: unknown } = {};
+    for (const name in resourceDef.calculatedProperties) {
+      const expr = resourceDef.calculatedProperties[name].expression;
+      // TODO: A calculated property without an expression should probably
+      // throw at least a warning. For now we'll just skip it.
+      if (!expr) continue;
+
+      // TODO: This needs to be re-written to handle calculated properties that
+      // reference other calculated props.
+      out[name] = evaluateExpression(expr, ctx);
+    }
+
+    return out;
+  }
+
   async updateResource({ uid, type, asUser, data }: UpdateResourceParams) {
     // TODO: Validate data against system definition before attempting update
     const success = await this.dataLoader.update(uid, type, data);
@@ -252,7 +303,7 @@ export default class PGBusinessEngine implements BusinessEngine {
     // Read the result back
     // TODO: Derive calculated fields and omit fields the user does not
     //  have permission to read
-    const rawResult = await this.dataLoader.read(uid, type);
+    const rawResult = await this._getRawResource({ uid, type, asUser });
 
     if (!rawResult) {
       return RESOURCE_NOT_FOUND;
@@ -273,7 +324,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       throw new Error("This resource has no transitions defined.");
     }
 
-    const resource = await this.dataLoader.read(uid, type);
+    const resource = await this._getRawResource({ uid, type, asUser });
     if (!resource) {
       throw new Error("The specified resource could not be found.");
     }
@@ -347,7 +398,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       throw new Error("That is not a valid transition for this resource.");
     }
 
-    const resource = await this.dataLoader.read(uid, type);
+    const resource = await this._getRawResource({ uid, type, asUser });
     if (!resource) {
       throw new Error("The specified resource could not be found.");
     }
@@ -384,7 +435,7 @@ export default class PGBusinessEngine implements BusinessEngine {
     }
     const actionDef = allActions[action];
 
-    const rawResult = await this.dataLoader.read(uid, type);
+    const rawResult = await this._getRawResource({ uid, type, asUser });
     if (!rawResult) {
       return { success: false, errors: [`Resource not found.`] };
     }

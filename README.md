@@ -3,31 +3,31 @@
 ## TODO:
 
 - [ ] Derive calculated fields
-- [x] [Demo frontend](demo/README.md) (run engine client-side)
 - [ ] References between resources
-- [ ] Action definition (transintions without exit state?)
+- [ ] Decide if expressions need to be async (for loading references)
+- [ ] Input objects to transitions &
+      actions
+- [ ] Action definition (transitions without exit state?)
+- [ ] Automatic audit history log
+- [ ] E-mails and other side effects in actions
+- [ ] Automatic role assignment (ball-in-court if a condition is met, etc)
+- [x] [Demo frontend](demo/README.md) (run engine client-side)
 - [x] Expression standard library
 - [ ] Custom functions in system definition -> expression context
 - [ ] User objects in expressions
 - [ ] updateResource
-- [ ] Input objects to transitions &
-      actions
 - [ ] Input validation on updates, transitions, actions
-- [ ] Automatic audit history log
 - [ ] i18n strings (for error messages or otherwise)
-- [ ] E-mails and other side effects in actions
+- [ ] Visibility control (allow / deny / _hide_ ?) for properties and objects
 - [x] Per-resource read permissions
-- [ ] Decide if expressions need to be async (for loading references)
+- [ ] Deletion rules (cascade, conditions)
 - [ ] Consistent exception handling
 - [ ] Cache & transaction control for data loader API
 - [ ] SQL data loader
 - [ ] Cleaner internal object validation
 - [ ] Expression language docs
-- [ ] Deletion rules (cascade, conditions)
 - [ ] Service layer generator (REST & GraphQL)
 - [ ] Expression test runner
-- [ ] Automatic role assignment (ball-in-court if a condition is met, etc)
-- [ ] Visibility control (allow / deny / _hide_ ?) for properties and objects
 
 ## Usage
 

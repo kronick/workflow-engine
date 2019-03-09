@@ -121,6 +121,61 @@ describe("Expression evaluator", () => {
     });
   });
 
+  describe("String expressions", () => {
+    it("calculates string length", () => {
+      expect(evaluate({ stringLength: "abc" })).toBe(3);
+      expect(evaluate({ stringLength: "abcdef" })).toBe(6);
+      expect(evaluate({ stringLength: "" })).toBe(0);
+    });
+
+    it("calcualtes string length when string is an expression", () => {
+      expect(
+        evaluate(
+          { stringLength: { get: "phrase" } },
+          { self: { phrase: "Hello world" } }
+        )
+      ).toBe(11);
+    });
+
+    it("joins strings", () => {
+      expect(evaluate({ joinStrings: ["a", "b", "c"] })).toEqual("abc");
+      expect(evaluate({ joinStrings: { strings: ["a", "b", "c"] } })).toEqual(
+        "abc"
+      );
+    });
+    it("joins strings with separator", () => {
+      expect(
+        evaluate({
+          joinStrings: {
+            strings: ["The", "quick", "brown", "fox"],
+            separator: " "
+          }
+        })
+      ).toEqual("The quick brown fox");
+
+      expect(
+        evaluate({
+          joinStrings: {
+            strings: ["a", "b", "c"],
+            separator: { joinStrings: ["-"] }
+          }
+        })
+      ).toEqual("a-b-c");
+    });
+    it("joins strings where values are an expression", () => {
+      expect(
+        evaluate({ joinStrings: ["X", { joinStrings: ["a", "b", "c"] }, "Y"] })
+      ).toBe("XabcY");
+
+      expect(
+        evaluate(
+          { joinStrings: { get: "strings" } },
+          { self: { strings: ["x", "y", "z"] } }
+        )
+      ).toBe("xyz");
+    });
+  });
+
   describe("Array operators", () => {
     it("Evaluates `contains` operator", () => {
       expect(

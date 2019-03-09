@@ -43,6 +43,7 @@ export type NumberProducingExpression =
   | PowerExpression
   | GetExpression<"number">
   | IfExpression
+  | StringLengthExpression
   | ArgExpression;
 
 export type BooleanProducingExpression =
@@ -71,7 +72,8 @@ export type StringProducingExpression =
   | GetExpression
   | IfExpression
   | string
-  | ArgExpression;
+  | ArgExpression
+  | JoinStringsExpression;
 
 /** An expression that produces an array of primitives */
 export type ArrayProducingExpression<
@@ -219,8 +221,22 @@ export interface NoneExpression {
   none: Array<BooleanProducingExpression>;
 }
 
+// String processing expressions
+///////////////////////////////////////////////////////////////////////////////
 export interface StringEqualityExpression {
   eq: [StringProducingExpression, StringProducingExpression];
+}
+export interface StringLengthExpression {
+  stringLength: StringProducingExpression;
+}
+
+export interface JoinStringsExpression {
+  joinStrings:
+    | ArrayProducingExpression<"string">
+    | {
+        strings: ArrayProducingExpression<"string">;
+        separator?: StringProducingExpression;
+      };
 }
 
 // Mathematical Expression definitions
