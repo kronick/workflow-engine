@@ -18,6 +18,14 @@ export const simpleDefinition: SystemDefinition = {
 
       defaultState: "authoring",
 
+      readPermissions: [
+        { roles: ["reviewer", "author"], conditions: ["allow"] },
+        {
+          roles: ["*"],
+          conditions: [{ allowIf: { inState: { states: ["published"] } } }]
+        }
+      ],
+
       properties: {
         title: {
           type: "string",
