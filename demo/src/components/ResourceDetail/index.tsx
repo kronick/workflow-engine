@@ -6,10 +6,14 @@ import {
 } from "pg-workflow-engine";
 import { PropertyTypeDefinition, User } from "pg-workflow-engine/dist/types";
 
+import HistoryLog from "../HistoryLog";
+
 import styles from "./ResourceDetail.module.css";
+import { HistoryEvent } from "pg-workflow-engine/dist/dataLoader/index";
 
 interface ResourceDetailProps {
   resource?: ResourceData | null;
+  historyEvents?: HistoryEvent[];
   engine: PGBusinessEngine;
   user: User | null;
   onUpdate: () => void;
@@ -143,6 +147,10 @@ export default class ResourceDetail extends React.Component<
               : null}
           </tbody>
         </table>
+
+        {this.props.historyEvents && (
+          <HistoryLog events={this.props.historyEvents} />
+        )}
       </div>
     );
   }

@@ -202,7 +202,9 @@ export const simpleDefinition: SystemDefinition = {
               conditions: ["allow"]
             },
             "deny"
-          ]
+          ],
+
+          includeInHistory: true
         },
 
         // Explicitly deny archiving once the document has been published.
@@ -246,6 +248,18 @@ export const simpleDefinition: SystemDefinition = {
               ]
             },
             "deny"
+          ],
+
+          includeInHistory: true,
+
+          effects: [
+            {
+              sendEmail: {
+                to: "reviewer@example.com",
+                template: "document-awaiting-your-review",
+                params: { uid: { get: "uid" } }
+              }
+            }
           ]
         },
 
@@ -259,7 +273,9 @@ export const simpleDefinition: SystemDefinition = {
               conditions: ["allow"]
             },
             "deny"
-          ]
+          ],
+
+          includeInHistory: true
         },
 
         returnForRevisions: {
@@ -272,7 +288,9 @@ export const simpleDefinition: SystemDefinition = {
               conditions: ["allow"]
             },
             "deny"
-          ]
+          ],
+
+          includeInHistory: true
         },
 
         publish: {
@@ -285,7 +303,9 @@ export const simpleDefinition: SystemDefinition = {
               conditions: ["allow"]
             },
             "deny"
-          ]
+          ],
+
+          includeInHistory: true
         },
 
         publishDirectly: {
@@ -299,7 +319,9 @@ export const simpleDefinition: SystemDefinition = {
               conditions: ["allow"]
             },
             "deny"
-          ]
+          ],
+
+          includeInHistory: true
         }
       }
     }

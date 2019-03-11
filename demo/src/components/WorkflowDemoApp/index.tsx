@@ -5,9 +5,11 @@ import { switchSystem } from "pg-workflow-engine/dist/mocks/systems";
 import { simpleDefinition } from "pg-workflow-engine/dist/example/simple";
 import {
   InMemoryDataLoader,
-  FakeInMemoryDataLoader
+  FakeInMemoryDataLoader,
+  HistoryEvent
 } from "pg-workflow-engine/dist/dataLoader";
 import { User } from "pg-workflow-engine/dist/types";
+import { MockEmailService } from "pg-workflow-engine/dist/emailService";
 
 import JSONEditor from "../JSONEditor";
 import ListView from "../ListView/index";
@@ -15,6 +17,8 @@ import ListView from "../ListView/index";
 import styles from "./WorkflowDemoApp.module.css";
 import "./GlobalStyles.css";
 import ResourceDetail from "../ResourceDetail";
+import { EmailServiceMessage } from "../../../../src/emailService/index";
+import EmailLog from "../EmailLog";
 
 interface WorkflowDemoAppProps {}
 
@@ -22,6 +26,7 @@ interface WorkflowDemoAppState {
   systemDefinition: string;
   dataLoader: InMemoryDataLoader;
   engine: PGBusinessEngine;
+  emailService: MockEmailService;
 
   systemError?: string | null;
   userError?: string | null;
@@ -31,6 +36,8 @@ interface WorkflowDemoAppState {
 
   selectedResourceID: ResourceID | null;
   selectedResourceData?: ResourceData | null;
+  selectedResourceHistory?: HistoryEvent[];
+  emails: EmailServiceMessage[];
 
   consoleOutput: ConsoleMessage[];
 }
@@ -50,15 +57,19 @@ export default class WorkflowDemoApp extends React.Component<
   constructor(props: WorkflowDemoAppProps) {
     super(props);
     const dataLoader = new FakeInMemoryDataLoader(simpleDefinition, 5);
+    const emailService = new MockEmailService();
     this.state = {
+      emailService,
       systemDefinition: JSON.stringify(simpleDefinition, null, 2),
       dataLoader,
-      engine: new PGBusinessEngine(simpleDefinition, dataLoader),
+      engine: new PGBusinessEngine(simpleDefinition, dataLoader, emailService),
       resourceList: {},
       user: { uid: "0", roles: [], firstName: "", lastName: "", email: "" },
       selectedResourceID: null,
       selectedResourceData: null,
-      consoleOutput: []
+      selectedResourceHistory: undefined,
+      consoleOutput: [],
+      emails: []
     };
   }
 
@@ -88,13 +99,16 @@ export default class WorkflowDemoApp extends React.Component<
         ? new FakeInMemoryDataLoader(parsed, 5)
         : this.state.dataLoader;
       dataLoader.loadDefinition(parsed);
-      const engine = new PGBusinessEngine(parsed, dataLoader);
+      const emailService = new MockEmailService();
+      const engine = new PGBusinessEngine(parsed, dataLoader, emailService);
       this.setState({
         engine,
         dataLoader,
+        emailService,
         systemError: null,
         systemDefinition: JSON.stringify(parsed, null, 2),
         selectedResourceID: null,
+        selectedResourceHistory: undefined,
         consoleOutput: []
       });
     } catch (e) {
@@ -127,9 +141,21 @@ export default class WorkflowDemoApp extends React.Component<
         asUser: this.state.user
       });
 
-      this.setState({ selectedResourceData: selectedResourceData.resource });
+      const selectedResourceHistory = await this.state.engine.getHistory({
+        ...this.state.selectedResourceID,
+        asUser: this.state.user
+      });
+
+      this.setState({
+        selectedResourceData: selectedResourceData.resource,
+        selectedResourceHistory: selectedResourceHistory.history
+      });
+
       if (selectedResourceData.errors) {
         this.logErrors(selectedResourceData.errors);
+      }
+      if (selectedResourceHistory.errors) {
+        this.logErrors(selectedResourceHistory.errors);
       }
     } else {
       try {
@@ -142,7 +168,10 @@ export default class WorkflowDemoApp extends React.Component<
       } catch (e) {}
     }
 
-    this.setState({ resourceList });
+    // Fetch emails
+    const emails = await this.state.emailService.getMessages();
+
+    this.setState({ resourceList, emails });
   };
 
   logErrors = (errors: string[]) => {
@@ -195,6 +224,7 @@ export default class WorkflowDemoApp extends React.Component<
               resource={this.state.selectedResourceData}
               onUpdate={this.refetchData}
               onError={this.logErrors}
+              historyEvents={this.state.selectedResourceHistory}
             />
           </div>
           <div className={styles.consoleView}>
@@ -217,7 +247,9 @@ export default class WorkflowDemoApp extends React.Component<
           </div>
         </div>
         <div className={styles.rightPanel}>
-          <div className={styles.expressionsView}>Expressions</div>
+          <div className={styles.emailLogView}>
+            <EmailLog messages={this.state.emails} />
+          </div>
         </div>
       </div>
     );

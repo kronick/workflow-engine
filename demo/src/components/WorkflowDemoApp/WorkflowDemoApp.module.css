@@ -37,6 +37,8 @@
 
 .docView {
   flex: 4;
+  flex-shrink: 1;
+  overflow-y: scroll;
 }
 
 .consoleView {
@@ -75,7 +77,7 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
+  justify-content: flex-start;
 }
 
 .expressionsView {
