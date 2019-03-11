@@ -1,143 +1,15 @@
 import { SystemDefinition, User } from "../types";
 import { FakeInMemoryDataLoader } from "../dataLoader/index";
 import PGBusinessEngine, { DescribeTransitionsResult } from "./";
-
-const simpleSystem: SystemDefinition = {
-  name: "Simple system",
-  roles: ["regular", "admin", "anonymous"],
-  resources: {
-    Switch: {
-      states: ["off", "on", "turbo", "impossible"],
-      readPermissions: [{ roles: ["regular", "admin"], conditions: ["allow"] }],
-      properties: {
-        maxVoltage: {
-          type: "number",
-          readPermissions: [
-            { roles: ["admin"], conditions: ["allow"] },
-            {
-              roles: ["regular"],
-              conditions: [
-                {
-                  allowIf: { inState: { states: ["off"] } },
-                  denyMessage:
-                    "You can only view maxVoltage when the switch is off"
-                }
-              ]
-            }
-          ]
-        },
-        password: {
-          type: "string",
-          readPermissions: [{ roles: ["admin"], conditions: ["allow"] }, "deny"]
-        },
-        timesSwitched: {
-          type: "number"
-        }
-      },
-      calculatedProperties: {
-        passwordLength: {
-          type: "number",
-          expression: { stringLength: { get: "password" } },
-          readPermissions: [{ roles: ["admin"], conditions: ["allow"] }]
-        },
-        secret: {
-          type: "number",
-          expression: { "+": [1, 2] }
-        }
-      },
-      transitions: {
-        turnOn: {
-          from: ["off", "turbo"],
-          to: "on",
-          includeInHistory: true,
-          effects: [
-            {
-              set: {
-                property: "timesSwitched",
-                value: { "+": [1, { get: "timesSwitched" }] }
-              }
-            }
-          ]
-        },
-        turnOff: {
-          from: ["on", "turbo"],
-          to: "off"
-        },
-        turnOnTurbo: {
-          from: ["off", "on"],
-          to: "turbo",
-          permissions: [
-            { roles: ["admin"], conditions: ["allow"] },
-            { denyWithMessage: "Only admins can turn the switch to turbo." }
-          ]
-        },
-        turnToImpossible: {
-          from: ["off", "on", "turbo"],
-          to: "impossible",
-          conditions: [{ denyWithMessage: "This action is never possible." }],
-          permissions: ["allow"]
-        },
-        allowSecretSwitch: {
-          from: ["off"],
-          to: "on",
-          description:
-            "A transition with a condition that depends on a calculated value that should always be allowed.",
-          conditions: [{ allowIf: { "=": [{ get: "secret" }, 3] } }]
-        },
-        denySecretSwitch: {
-          from: ["off"],
-          to: "on",
-          description:
-            "A transition with a condition that depends on a calculated value that should never be allowed.",
-          conditions: [{ allowIf: { "=": [{ get: "secret" }, 0] } }]
-        }
-      }
-    }
-  }
-};
-
-/** Test helper that will create a system with asingle `Switch` resource */
-async function createSimpleSystem(n: number = 1) {
-  const dataLoader = new FakeInMemoryDataLoader(simpleSystem, n);
-  const resource = await dataLoader.list("Switch");
-  const engine = new PGBusinessEngine(simpleSystem, dataLoader);
-  const adminUser: User = {
-    uid: "a",
-    firstName: "Admin",
-    lastName: "User",
-    roles: ["admin"],
-    email: "admin@example.com"
-  };
-  const regularUser: User = {
-    uid: "b",
-    firstName: "Regular",
-    lastName: "User",
-    roles: ["regular"],
-    email: "user@example.com"
-  };
-
-  const anonymousUser: User = {
-    uid: "c",
-    firstName: "Anonymous",
-    lastName: "User",
-    roles: ["anonymous"],
-    email: "anonymous@example.com"
-  };
-  return {
-    engine,
-    resource: resource[0],
-    adminUser,
-    regularUser,
-    anonymousUser
-  };
-}
+import { MockEmailService, EmailService } from "../emailService/index";
 
 describe("Business engine", async () => {
   let engine: PGBusinessEngine,
     resource: { uid: string; type: string },
     adminUser: User,
     regularUser: User,
-    anonymousUser: User;
+    anonymousUser: User,
+    emailService: EmailService;
 
   // Build a fresh environment before each test
   beforeEach(async () => {
@@ -147,6 +19,7 @@ describe("Business engine", async () => {
     adminUser = system.adminUser;
     regularUser = system.regularUser;
     anonymousUser = system.anonymousUser;
+    emailService = system.emailService;
   });
 
   describe("Listing", () => {
@@ -414,6 +287,28 @@ describe("Business engine", async () => {
         (originalResult.resource!.timesSwitched.value as number) + 1
       );
     });
+
+    it("sends email as side effect", async () => {
+      const originalResult = await engine.getResource({
+        ...resource,
+        asUser: regularUser
+      });
+
+      await engine.performAction({
+        uid: resource.uid,
+        type: resource.type,
+        asUser: adminUser,
+        action: "turnOnTurbo"
+      });
+
+      const messages = await (emailService as MockEmailService).getMessages();
+
+      expect(messages.length).toEqual(1);
+      expect(messages[0].to).toEqual("admin@example.com");
+      expect(messages[0].params.maxVoltage).toEqual(
+        originalResult.resource!.maxVoltage.value
+      );
+    });
   });
 
   describe("History log", () => {
@@ -435,3 +330,146 @@ describe("Business engine", async () => {
     });
   });
 });
+
+///////////////////////////////////////////////////////////////////////////////
+
+const simpleSystem: SystemDefinition = {
+  name: "Simple system",
+  roles: ["regular", "admin", "anonymous"],
+  resources: {
+    Switch: {
+      states: ["off", "on", "turbo", "impossible"],
+      readPermissions: [{ roles: ["regular", "admin"], conditions: ["allow"] }],
+      properties: {
+        maxVoltage: {
+          type: "number",
+          readPermissions: [
+            { roles: ["admin"], conditions: ["allow"] },
+            {
+              roles: ["regular"],
+              conditions: [
+                {
+                  allowIf: { inState: { states: ["off"] } },
+                  denyMessage:
+                    "You can only view maxVoltage when the switch is off"
+                }
+              ]
+            }
+          ]
+        },
+        password: {
+          type: "string",
+          readPermissions: [{ roles: ["admin"], conditions: ["allow"] }, "deny"]
+        },
+        timesSwitched: {
+          type: "number"
+        }
+      },
+      calculatedProperties: {
+        passwordLength: {
+          type: "number",
+          expression: { stringLength: { get: "password" } },
+          readPermissions: [{ roles: ["admin"], conditions: ["allow"] }]
+        },
+        secret: {
+          type: "number",
+          expression: { "+": [1, 2] }
+        }
+      },
+      transitions: {
+        turnOn: {
+          from: ["off", "turbo"],
+          to: "on",
+          includeInHistory: true,
+          effects: [
+            {
+              set: {
+                property: "timesSwitched",
+                value: { "+": [1, { get: "timesSwitched" }] }
+              }
+            }
+          ]
+        },
+        turnOff: {
+          from: ["on", "turbo"],
+          to: "off"
+        },
+        turnOnTurbo: {
+          from: ["off", "on"],
+          to: "turbo",
+          permissions: [
+            { roles: ["admin"], conditions: ["allow"] },
+            { denyWithMessage: "Only admins can turn the switch to turbo." }
+          ],
+          effects: [
+            {
+              sendEmail: {
+                to: "admin@example.com",
+                params: { maxVoltage: { get: "maxVoltage" } },
+                template: "turbo"
+              }
+            }
+          ]
+        },
+        turnToImpossible: {
+          from: ["off", "on", "turbo"],
+          to: "impossible",
+          conditions: [{ denyWithMessage: "This action is never possible." }],
+          permissions: ["allow"]
+        },
+        allowSecretSwitch: {
+          from: ["off"],
+          to: "on",
+          description:
+            "A transition with a condition that depends on a calculated value that should always be allowed.",
+          conditions: [{ allowIf: { "=": [{ get: "secret" }, 3] } }]
+        },
+        denySecretSwitch: {
+          from: ["off"],
+          to: "on",
+          description:
+            "A transition with a condition that depends on a calculated value that should never be allowed.",
+          conditions: [{ allowIf: { "=": [{ get: "secret" }, 0] } }]
+        }
+      }
+    }
+  }
+};
+
+/** Test helper that will create a system with asingle `Switch` resource */
+async function createSimpleSystem(n: number = 1) {
+  const dataLoader = new FakeInMemoryDataLoader(simpleSystem, n);
+  const emailService = new MockEmailService();
+  const resource = await dataLoader.list("Switch");
+  const engine = new PGBusinessEngine(simpleSystem, dataLoader, emailService);
+  const adminUser: User = {
+    uid: "a",
+    firstName: "Admin",
+    lastName: "User",
+    roles: ["admin"],
+    email: "admin@example.com"
+  };
+  const regularUser: User = {
+    uid: "b",
+    firstName: "Regular",
+    lastName: "User",
+    roles: ["regular"],
+    email: "user@example.com"
+  };
+
+  const anonymousUser: User = {
+    uid: "c",
+    firstName: "Anonymous",
+    lastName: "User",
+    roles: ["anonymous"],
+    email: "anonymous@example.com"
+  };
+  return {
+    engine,
+    emailService,
+    resource: resource[0],
+    adminUser,
+    regularUser,
+    anonymousUser
+  };
+}

@@ -7,6 +7,7 @@ import { ConditionResult } from "../rules-engine/conditions/index";
 import { TransitionDefinition, ResourceDefinition } from "../types/resources";
 import { stdlibCtx } from "../rules-engine/expression/stdlib";
 import evaluateEffects, { EffectResult, UpdateEffectResult } from "../effects";
+import { EmailService } from "../emailService";
 
 export interface RawUnknownResource {
   [property: string]: unknown;
@@ -179,10 +180,16 @@ const HISTORY_ACCESS_DENIED = {
 export default class PGBusinessEngine implements BusinessEngine {
   system: SystemDefinition;
   dataLoader: DataLoader;
+  emailService: EmailService;
 
-  constructor(definition: SystemDefinition, dataLoader: DataLoader) {
+  constructor(
+    definition: SystemDefinition,
+    dataLoader: DataLoader,
+    emailService: EmailService
+  ) {
     this.system = definition;
     this.dataLoader = dataLoader;
+    this.emailService = emailService;
   }
 
   listResourceTypes() {
@@ -559,6 +566,11 @@ export default class PGBusinessEngine implements BusinessEngine {
     effects.forEach(async e => {
       switch (e.type) {
         case "email":
+          this.emailService.sendMessage({
+            to: e.to,
+            template: e.template,
+            params: e.params
+          });
           break;
         case "update":
           // TODO: Should we check write permissions at this step too?

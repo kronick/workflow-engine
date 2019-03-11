@@ -38,29 +38,3 @@ export const switchSystem: SystemDefinition = {
     }
   }
 };
-
-/** Test helper that will create a system with a single `Switch` resource */
-export async function createSimpleSystem(
-  system: SystemDefinition,
-  listType: string,
-  nResources = 1
-) {
-  const dataLoader = new FakeInMemoryDataLoader(system, nResources);
-  const resources = await dataLoader.list(listType);
-  const engine = new PGBusinessEngine(system, dataLoader);
-  const adminUser: User = {
-    uid: "a",
-    firstName: "Admin",
-    lastName: "User",
-    roles: ["admin"],
-    email: "admin@example.com"
-  };
-  const regularUser: User = {
-    uid: "a",
-    firstName: "Regular",
-    lastName: "User",
-    roles: ["regular"],
-    email: "user@example.com"
-  };
-  return { engine, resources, adminUser, regularUser };
-}
