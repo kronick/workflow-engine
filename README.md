@@ -5,7 +5,7 @@
 - [x] Derive calculated fields
 - [ ] Automatic audit history log
 - [ ] References between resources
-- [ ] Decide if expressions need to be async (for loading references)
+- [ ] Decide if expressions need to be async (for loading references). Or use continuations?
 - [ ] DFS / Topo sort for calculated fields and references
 - [ ] Input objects to transitions &
       actions
@@ -57,6 +57,20 @@
   ```
   yarn build:live
   ```
+
+## Order of operations
+
+When performing an action, the following steps are evaluated in order
+
+1. Retrieve resource properties
+2. Calculate resource calculated properties
+3. TODO: Evaluate resource-relationship role expressions (i.e. "ball-in-court" or "creator")
+4. TODO: Evaluate resource-level write permissions
+5. Evaluate action-level conditions
+6. Evaluate action-level permissions
+7. Update resource state (if applicable)
+8. Apply defined effects (in order)
+9. Write action and effects list to history log (if applicable)
 
 ### Input validation
 

@@ -29,6 +29,9 @@ const simpleSystem: SystemDefinition = {
         password: {
           type: "string",
           readPermissions: [{ roles: ["admin"], conditions: ["allow"] }, "deny"]
+        },
+        timesSwitched: {
+          type: "number"
         }
       },
       calculatedProperties: {
@@ -45,7 +48,16 @@ const simpleSystem: SystemDefinition = {
       transitions: {
         turnOn: {
           from: ["off", "turbo"],
-          to: "on"
+          to: "on",
+          includeInHistory: true,
+          effects: [
+            {
+              set: {
+                property: "timesSwitched",
+                value: { "+": [1, { get: "timesSwitched" }] }
+              }
+            }
+          ]
         },
         turnOff: {
           from: ["on", "turbo"],
@@ -376,6 +388,50 @@ describe("Business engine", async () => {
       expect(result.success).toBe(false);
       // Should have errors
       expect(result.errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Action effects", () => {
+    it("performs side effect of action", async () => {
+      const originalResult = await engine.getResource({
+        ...resource,
+        asUser: regularUser
+      });
+
+      await engine.performAction({
+        uid: resource.uid,
+        type: resource.type,
+        asUser: adminUser,
+        action: "turnOn"
+      });
+
+      const readResult = await engine.getResource({
+        ...resource,
+        asUser: regularUser
+      });
+
+      expect(readResult.resource!.timesSwitched.value).toEqual(
+        (originalResult.resource!.timesSwitched.value as number) + 1
+      );
+    });
+  });
+
+  describe("History log", () => {
+    it("logs history event for actions", async () => {
+      await engine.performAction({
+        uid: resource.uid,
+        type: resource.type,
+        asUser: adminUser,
+        action: "turnOn"
+      });
+
+      const log = await engine.getHistory({
+        ...resource,
+        asUser: regularUser
+      });
+
+      expect(log.history!.length).toBe(1);
+      expect(log.history![0].changes.length).toBe(1);
     });
   });
 });

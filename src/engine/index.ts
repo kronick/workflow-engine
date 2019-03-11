@@ -1,11 +1,12 @@
 import { SystemDefinition, User } from "../types/";
-import { DataLoader, UnknownResourceData } from "../dataLoader";
+import { DataLoader, UnknownResourceData, HistoryEvent } from "../dataLoader";
 import evaluateConditions from "../rules-engine/conditions";
 import evaluatePermissions from "../rules-engine/permissions";
-import evaluateExpression from "../rules-engine/expression";
+import evaluateExpression, { $boolean } from "../rules-engine/expression";
 import { ConditionResult } from "../rules-engine/conditions/index";
 import { TransitionDefinition, ResourceDefinition } from "../types/resources";
 import { stdlibCtx } from "../rules-engine/expression/stdlib";
+import evaluateEffects, { EffectResult, UpdateEffectResult } from "../effects";
 
 export interface RawUnknownResource {
   [property: string]: unknown;
@@ -34,6 +35,13 @@ interface GetResourceParams {
 }
 type GetResourceResult = Result<UnknownResource, "resource">;
 type GetPropertyResult<T> = Result<T, "value">;
+
+interface GetHistoryParams {
+  uid: string;
+  type: string;
+  asUser: User;
+}
+type GetHistoryResult = Result<HistoryEvent[], "history">;
 
 /** Generic type to represent a request result.
  *  Allows for two keys: `errors` (required) and a dynamically-named `TDataKey`
@@ -146,6 +154,9 @@ interface BusinessEngine {
 
   /** Perform a named action on a resource */
   performAction(params: PerformActionParams): Promise<PerformActionResult>;
+
+  /** Get the history event log for a resource */
+  getHistory(params: GetHistoryParams): Promise<GetHistoryResult>;
 }
 
 const RESOURCE_NOT_FOUND = {
@@ -156,6 +167,15 @@ const RESOURCE_ACCESS_DENIED = {
   resource: undefined,
   errors: ["Access denied."]
 };
+const HISTORY_NOT_FOUND = {
+  history: undefined,
+  errors: ["Resource not found."]
+};
+const HISTORY_ACCESS_DENIED = {
+  history: undefined,
+  errors: ["Access denied."]
+};
+
 export default class PGBusinessEngine implements BusinessEngine {
   system: SystemDefinition;
   dataLoader: DataLoader;
@@ -269,6 +289,47 @@ export default class PGBusinessEngine implements BusinessEngine {
       resource: visibleResult,
       errors: []
     };
+  }
+
+  async getHistory({ uid, type, asUser }: GetHistoryParams) {
+    const rawResult = await this._getRawResource({ uid, type, asUser });
+
+    if (!rawResult) {
+      return HISTORY_NOT_FOUND;
+    }
+
+    const ctx = stdlibCtx({ self: rawResult });
+
+    const resourceDef = this.system.resources[type];
+
+    if (!resourceDef) {
+      return HISTORY_NOT_FOUND;
+    }
+
+    // Enforce resource-level read permissions
+    const permissions = this.system.resources[type].readPermissions;
+    if (permissions) {
+      const result = evaluatePermissions(permissions, asUser, ctx);
+      if (result.decision === "deny") {
+        this._evaluateTransitionPermissions;
+        if (result.reason) {
+          return { history: undefined, errors: [result.reason] };
+        }
+        return HISTORY_ACCESS_DENIED;
+      }
+    }
+
+    try {
+      return {
+        history: await this.dataLoader.getHistory(uid, type),
+        errors: []
+      };
+    } catch (e) {
+      return {
+        history: undefined,
+        errors: ["Unexpected error fetching history."]
+      };
+    }
   }
 
   _calculateProperties(
@@ -440,6 +501,8 @@ export default class PGBusinessEngine implements BusinessEngine {
       return { success: false, errors: [`Resource not found.`] };
     }
 
+    const ctx = stdlibCtx({ self: { ...rawResult, uid, type } });
+
     const { allowed } = this._evaluateTransitionPermissions(
       actionDef,
       rawResult,
@@ -447,15 +510,104 @@ export default class PGBusinessEngine implements BusinessEngine {
     );
 
     if (allowed.decision === "allow") {
-      // The action is allowed. Perform the action.
-      // TODO: Add in handling of other action effects (i.e. sending e-mails,
-      //  updating other data, etc)
-      const toState = actionDef.to;
-      this.dataLoader.update(uid, type, { state: toState });
+      // The action is allowed. Evaluate the action and create a list of
+      // its effects.
+      const effects: EffectResult[] = [];
+
+      // Evaluated expression that determines if this action should log a
+      // history event.
+      const includeInHistory =
+        actionDef.includeInHistory !== undefined
+          ? $boolean(actionDef.includeInHistory, ctx)
+          : false;
+
+      // If there is a `to` state specified, create a `update` effect
+      // that sets the `state` property of the current resource
+      if (actionDef.to) {
+        effects.push({
+          type: "update",
+          properties: { state: actionDef.to },
+          on: { uid, type }, // Current resource
+          includeInHistory
+        });
+      }
+
+      // If there are other effects defined, evaluate those
+      if (actionDef.effects) {
+        evaluateEffects(actionDef.effects, ctx);
+        effects.push(...evaluateEffects(actionDef.effects, ctx));
+      }
+
+      // Now that all effects have been evaluated, execute them
+      // TODO: Error handling and reporting
+      await this._performEffects(effects, { uid, type }, includeInHistory);
 
       return { success: true, errors: [] };
     } else {
       return { success: false, errors: [allowed.reason || "Access denied."] };
     }
   }
+
+  /** Perform side effects of an action, such as updating resources via the
+   *  dataLoader, sending e-mails, and logging history events.
+   */
+  async _performEffects(
+    effects: EffectResult[],
+    parent: { uid: string; type: string },
+    writeHistory: boolean
+  ) {
+    effects.forEach(async e => {
+      switch (e.type) {
+        case "email":
+          break;
+        case "update":
+          // TODO: Should we check write permissions at this step too?
+          await this.dataLoader.update(e.on.uid, e.on.type, e.properties);
+          break;
+      }
+    });
+
+    if (writeHistory) {
+      // Merge all updated properties on each updated object
+      const updated: Map<string, { [key: string]: unknown }> = new Map();
+      effects
+        // Only include effects that are marked to include in history
+        .filter(e => e.type === "update" && e.includeInHistory)
+        .map(e => e as UpdateEffectResult)
+        .forEach(e => {
+          const k = makeKey(e.on.uid, e.on.type);
+          updated.set(k, { ...updated.get(k), ...e.properties });
+        });
+
+      const event: HistoryEvent = {
+        timestamp: new Date().getTime(),
+        parentResource: parent,
+        changes: Array.from(updated.entries())
+          .map(update => {
+            const resource = parseKey(update[0]);
+            const properties = update[1];
+            return Object.keys(properties).map(p => ({
+              resource,
+              property: p,
+              old: null,
+              new: properties[p]
+            }));
+          })
+          .reduce((prev, curr) => prev.concat(curr), [])
+      };
+
+      // Write a history event
+      await this.dataLoader.writeHistory(parent.uid, parent.type, event);
+      // this.dataLoader.update(uid, type, { state: toState });
+    }
+  }
+}
+
+// TODO: These probably don't belong here
+function makeKey(uid: string, type: string) {
+  return `${type}#${uid}`;
+}
+function parseKey(key: string) {
+  const parts = key.split("#");
+  return { uid: parts[1], type: parts[0] };
 }

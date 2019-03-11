@@ -28,10 +28,6 @@ export type Expression<T extends ExpressionResultTypes = "string"> =
   | Array<string | boolean | number | Date>
   | ArgExpression;
 
-export type OperatorExpression = {
-  [operator: string]: { [key: string]: any } | any[];
-};
-
 export type NumberProducingExpression =
   | number
   | SumExpression

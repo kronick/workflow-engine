@@ -226,7 +226,7 @@ const operatorMap: OperatorMap = {
 
 /** Evaluate an expression and expect a number as a return value.
  *  Throws an error if it is any other type */
-function $number(n: any, ctx: ExpressionContext) {
+export function $number(n: any, ctx: ExpressionContext) {
   const evaluated = e(n, ctx);
   if (typeof evaluated !== "number")
     throw new ExpressionTypeError("number", evaluated);
@@ -236,7 +236,7 @@ function $number(n: any, ctx: ExpressionContext) {
 
 /** Evaluate an expression and expect a string as a return value.
  *  Throws an error if it is any other type */
-function $string(n: any, ctx: ExpressionContext) {
+export function $string(n: any, ctx: ExpressionContext) {
   const evaluated = e(n, ctx);
   if (typeof evaluated !== "string")
     throw new ExpressionTypeError("string", evaluated);
@@ -246,7 +246,7 @@ function $string(n: any, ctx: ExpressionContext) {
 
 /** Evaluate an expression and expect a boolean as a return value.
  *  Throws an error if it is any other type */
-function $boolean(n: any, ctx: ExpressionContext) {
+export function $boolean(n: any, ctx: ExpressionContext) {
   const evaluated = e(n, ctx);
   if (typeof evaluated !== "boolean")
     throw new ExpressionTypeError("boolean", evaluated);
@@ -256,7 +256,7 @@ function $boolean(n: any, ctx: ExpressionContext) {
 
 /** Evaluate an expression and expect an array as a return value.
  *  Throws an error if it is any other type */
-function $array(n: any, ctx: ExpressionContext) {
+export function $array(n: any, ctx: ExpressionContext) {
   const evaluated = e(n, ctx);
   if (!Array.isArray(evaluated))
     throw new ExpressionTypeError("array", evaluated);

@@ -128,7 +128,7 @@ describe("Expression evaluator", () => {
       expect(evaluate({ stringLength: "" })).toBe(0);
     });
 
-    it("calcualtes string length when string is an expression", () => {
+    it("calculates string length when string is an expression", () => {
       expect(
         evaluate(
           { stringLength: { get: "phrase" } },

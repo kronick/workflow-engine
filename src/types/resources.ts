@@ -1,4 +1,10 @@
-import { Expression, BooleanProducingExpression } from "./expressions";
+import {
+  Expression,
+  BooleanProducingExpression,
+  StringProducingExpression,
+  ArrayProducingExpression,
+  ResourceProducingExpression
+} from "./expressions";
 
 export interface SystemDefinition {
   name: string;
@@ -88,6 +94,73 @@ export interface TransitionDefinition {
    *  `conditions` checks AND the `permissions` checks evaluate to `allow`.
    */
   permissions?: PermissionDefinition;
+
+  /** An optional list of effects to apply as a result of the transition. */
+  effects?: EffectListDefinition;
+
+  /** A boolean or expression that will determine whether this action and any
+   *  associated state transition is logged in the resource's history
+   */
+  includeInHistory?: BooleanProducingExpression;
+}
+
+// Effects
+///////////////////////////////////////////////////////////////////////////////
+export type EffectListDefinition = EffectDefinition[];
+export type EffectDefinition =
+  | EmailEffectDefinition
+  | UpdateEffectDefinition
+  | ConditionalEffectDefinition
+  | SetEffectDefinition;
+
+export type ConditionalEffectDefinition = {
+  effectIf: BooleanProducingExpression;
+  effects: EffectListDefinition;
+};
+export interface EmailEffectDefinition {
+  sendEmail: {
+    to: StringProducingExpression;
+    template: StringProducingExpression;
+    params: { [key: string]: Expression };
+    includeInHistory?: BooleanProducingExpression;
+  };
+}
+
+/** Update a resource by merging in properties from another resource */
+export interface UpdateEffectDefinition {
+  update: {
+    /** An array of property names to be updated */
+    properties: ArrayProducingExpression<"string">;
+
+    /** Source resource from which properties will be read */
+    from: ResourceProducingExpression;
+
+    /** Destination resource that will have its properties updated.
+     *  Defaults to `self` */
+    to?: ResourceProducingExpression;
+
+    includeInHistory?: BooleanProducingExpression;
+  };
+}
+
+// TODO: Also need CreateEffectDefintion and DeleteEffectDefinition for
+// creating/updating resources as the result of an action
+
+/** Update a resource by setting a single new property value */
+export interface SetEffectDefinition {
+  set: {
+    /** Name of property to be updated */
+    property: StringProducingExpression;
+
+    /** Destination resource that will have its property updated.
+     *  Defaults to `self` */
+    on?: ResourceProducingExpression;
+
+    /** New value for the property */
+    value: Expression;
+
+    includeInHistory?: BooleanProducingExpression;
+  };
 }
 
 export type PermissionDefinition = Array<PermissionRule>;

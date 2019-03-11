@@ -6,6 +6,26 @@ export interface UnknownResourceData {
   state: string;
 }
 
+export type Change = SinglePropertyChange | ListPropertyChange;
+interface SinglePropertyChange {
+  resource: { uid: string; type: string };
+  property: string;
+  old: unknown;
+  new: unknown;
+}
+interface ListPropertyChange {
+  resource: { uid: string; type: string };
+  property: string;
+  added: unknown[];
+  removed: unknown[];
+}
+
+export interface HistoryEvent {
+  timestamp: number;
+  changes: Change[];
+  parentResource: { uid: string; type: string };
+}
+
 export interface DataLoader {
   create(
     type: string,
@@ -16,10 +36,19 @@ export interface DataLoader {
   delete(uid: string, type: string, data: Object): Promise<boolean>;
 
   list(type: string): Promise<Array<{ uid: string; type: string }>>;
+
+  writeHistory(
+    uid: string,
+    type: string,
+    event: HistoryEvent
+  ): Promise<boolean>;
+
+  getHistory(uid: string, type: string): Promise<HistoryEvent[]>;
 }
 
 export class InMemoryDataLoader implements DataLoader {
   data: Map<string, UnknownResourceData> = new Map();
+  historyEvents: Map<string, HistoryEvent[]> = new Map();
   last_uid = 0;
 
   definition: SystemDefinition | null = null;
@@ -88,6 +117,19 @@ export class InMemoryDataLoader implements DataLoader {
         )
         .map(([key, value]) => InMemoryDataLoader.parseKey(key))
     );
+  }
+
+  writeHistory(uid: string, type: string, event: HistoryEvent) {
+    const k = InMemoryDataLoader.makeKey(uid, type);
+    const events = this.historyEvents.get(k) || [];
+    this.historyEvents.set(k, [...events, event]);
+    return Promise.resolve(true);
+  }
+
+  getHistory(uid: string, type: string) {
+    const k = InMemoryDataLoader.makeKey(uid, type);
+    const events = this.historyEvents.get(k) || [];
+    return Promise.resolve(events);
   }
 
   static makeKey(uid: string, type: string) {
