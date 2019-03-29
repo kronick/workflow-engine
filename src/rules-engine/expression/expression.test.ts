@@ -4,84 +4,82 @@ import { Expression } from "../../types/expressions";
 
 describe("Expression evaluator", () => {
   describe("Primitive types", () => {
-    it("passes through trivial types", () => {
-      expect(evaluate(1)).toEqual(1);
-      expect(evaluate(0)).toEqual(0);
-      expect(evaluate(true)).toEqual(true);
-      expect(evaluate(false)).toEqual(false);
-      expect(evaluate("zing")).toEqual("zing");
-      expect(evaluate([1, 2, 3])).toEqual([1, 2, 3]);
-      expect(evaluate([1])).toEqual([1]);
+    it("passes through trivial types", async () => {
+      expect(await evaluate(1)).toEqual(1);
+      expect(await evaluate(0)).toEqual(0);
+      expect(await evaluate(true)).toEqual(true);
+      expect(await evaluate(false)).toEqual(false);
+      expect(await evaluate("zing")).toEqual("zing");
+      expect(await evaluate([1, 2, 3])).toEqual([1, 2, 3]);
+      expect(await evaluate([1])).toEqual([1]);
 
       const d = new Date();
-      expect(evaluate(d)).toEqual(d);
-      expect(evaluate([d, d, d])).toEqual([d, d, d]);
+      expect(await evaluate(d)).toEqual(d);
+      expect(await evaluate([d, d, d])).toEqual([d, d, d]);
     });
   });
 
   describe("Syntax errors", () => {
-    it("throws errors for invalid objects", () => {
-      expect(() => evaluate({} as any)).toThrow();
-      expect(() => evaluate({ foo: "", bar: "" } as any)).toThrow();
-
-      expect(() => evaluate({ if: true } as any)).toThrow();
-
-      expect(() => evaluate({ if: true, then: "" } as any)).toThrow();
-      expect(() =>
-        evaluate({ if: true, then: "", else: "", bogus: true } as any)
-      ).toThrow();
+    it("throws errors for invalid objects", async () => {
+      await expectAllThrow([
+        {},
+        { foo: "", bar: "" },
+        { if: true },
+        { if: true, then: "" },
+        { if: true, then: "", else: "", bogus: true }
+      ] as any[]);
     });
   });
 
   describe("Type errors", () => {
-    it("throws error for non-numerical values", () => {
-      expect(() => evaluate({ "+": [5, "a" as any] })).toThrowError();
-      expect(() =>
-        evaluate({
-          "+": [5, { "*": [1, { "+": [true as any, 1] }] }]
-        })
-      ).toThrow();
-      expect(() =>
-        evaluate({ "+": [{ if: false, then: 4, else: false }, 1] })
-      ).toThrow();
+    it("throws error for non-numerical values", async () => {
+      await expectAllThrow([
+        { "+": [5, "a"] },
+        {
+          "+": [5, { "*": [1, { "+": [true, 1] }] }]
+        },
+        { "+": [{ if: false, then: 4, else: false }, 1] }
+      ] as any[]);
     });
 
-    it("throws error for non-boolean values", () => {
-      expect(() => evaluate({ if: 1, then: 2, else: 3 })).toThrow();
-      expect(() => evaluate({ not: 1 as any })).toThrow();
-      expect(() => evaluate({ or: [false, 1 as any] })).toThrow();
+    it("throws error for non-boolean values", async () => {
+      await expectAllThrow([
+        { if: 1, then: 2, else: 3 },
+        { not: 1 },
+        { or: [false, 1] }
+      ] as any);
     });
 
-    it("throws error for non-string values", () => {
-      expect(() => evaluate({ eq: [1 as any, ""] })).toThrow();
+    it("throws error for non-string values", async () => {
+      await expectAllThrow([{ eq: [1, ""] }]);
     });
   });
 
   describe("Operators", () => {
-    it("evaluates mathematical operators", () => {
-      expect(evaluate({ "+": [1, 2] })).toEqual(3);
-      expect(evaluate({ "-": [1, 2] })).toEqual(-1);
-      expect(evaluate({ "*": [4, 2] })).toEqual(8);
-      expect(evaluate({ "/": [4, 2] })).toEqual(2);
-      expect(evaluate({ "%": [9, 4] })).toEqual(1);
-      expect(evaluate({ pow: [2, 3] })).toEqual(8);
-      expect(evaluate({ "=": [2, 3] })).toEqual(false);
-      expect(evaluate({ "=": [2, 2] })).toEqual(true);
-      expect(evaluate({ "<": [2, 2] })).toEqual(false);
-      expect(evaluate({ "<": [2, 200] })).toEqual(true);
-      expect(evaluate({ ">": [1, 2] })).toEqual(false);
-      expect(evaluate({ ">": [0, -200] })).toEqual(true);
+    it("evaluates mathematical operators", async () => {
+      expect(await evaluate({ "+": [1, 2] })).toEqual(3);
+      expect(await evaluate({ "-": [1, 2] })).toEqual(-1);
+      expect(await evaluate({ "*": [4, 2] })).toEqual(8);
+      expect(await evaluate({ "/": [4, 2] })).toEqual(2);
+      expect(await evaluate({ "%": [9, 4] })).toEqual(1);
+      expect(await evaluate({ pow: [2, 3] })).toEqual(8);
+      expect(await evaluate({ "=": [2, 3] })).toEqual(false);
+      expect(await evaluate({ "=": [2, 2] })).toEqual(true);
+      expect(await evaluate({ "<": [2, 2] })).toEqual(false);
+      expect(await evaluate({ "<": [2, 200] })).toEqual(true);
+      expect(await evaluate({ ">": [1, 2] })).toEqual(false);
+      expect(await evaluate({ ">": [0, -200] })).toEqual(true);
     });
 
-    it("evaluates compound mathematical expressions", () => {
+    it("evaluates compound mathematical expressions", async () => {
       expect(
-        evaluate({
+        await evaluate({
           "+": [{ "*": [2, 10] }, { pow: [2, 3] }]
         })
       ).toEqual(28);
 
       expect(
-        evaluate({
+        await evaluate({
           if: { "=": [6, 2] },
           then: 10,
           else: 20
@@ -89,63 +87,72 @@ describe("Expression evaluator", () => {
       ).toEqual(20);
     });
 
-    it("evaluates string equality operator", () => {
-      expect(evaluate({ eq: ["foo", "bar"] })).toBe(false);
-      expect(evaluate({ eq: ["bling", "bling"] })).toBe(true);
+    it("evaluates string equality operator", async () => {
+      expect(await evaluate({ eq: ["foo", "bar"] })).toBe(false);
+      expect(await evaluate({ eq: ["bling", "bling"] })).toBe(true);
     });
 
-    it("evaluates boolean expressions", () => {
-      expect(evaluate({ or: [false, false] })).toBe(false);
-      expect(evaluate({ or: [false, true] })).toBe(true);
-      expect(evaluate({ or: [true, false] })).toBe(true);
-      expect(evaluate({ or: [true, true] })).toBe(true);
+    it("evaluates boolean expressions", async () => {
+      expect(await evaluate({ or: [false, false] })).toBe(false);
+      expect(await evaluate({ or: [false, true] })).toBe(true);
+      expect(await evaluate({ or: [true, false] })).toBe(true);
+      expect(await evaluate({ or: [true, true] })).toBe(true);
 
-      expect(evaluate({ and: [false, false] })).toBe(false);
-      expect(evaluate({ and: [false, true] })).toBe(false);
-      expect(evaluate({ and: [true, false] })).toBe(false);
-      expect(evaluate({ and: [true, true] })).toBe(true);
+      expect(await evaluate({ and: [false, false] })).toBe(false);
+      expect(await evaluate({ and: [false, true] })).toBe(false);
+      expect(await evaluate({ and: [true, false] })).toBe(false);
+      expect(await evaluate({ and: [true, true] })).toBe(true);
 
-      expect(evaluate({ not: false })).toBe(true);
-      expect(evaluate({ not: true })).toBe(false);
+      expect(await evaluate({ not: false })).toBe(true);
+      expect(await evaluate({ not: true })).toBe(false);
 
-      expect(evaluate({ or: [{ not: true }, { and: [true, true] }] })).toBe(
-        true
-      );
+      expect(
+        await evaluate({ or: [{ not: true }, { and: [true, true] }] })
+      ).toBe(true);
     });
 
-    it("short circuits on boolean 'or'", () => {
+    it("short circuits on boolean 'or'", async () => {
       // The second parameter to this `or` expression should throw an exception
       // if it gets evaluated, but if the `or` expression short-circuits it
       // will never get evaluated.
-      expect(() => evaluate({ or: [true, 1 as any] })).not.toThrow();
+
+      expect(await evaluate({ or: [true, 1 as any] })).toBe(true);
+    });
+
+    it("short circuits on boolean 'and'", async () => {
+      // The second parameter to this `and` expression should throw an exception
+      // if it gets evaluated, but if the `and` expression short-circuits it
+      // will never get evaluated.
+
+      expect(await evaluate({ and: [false, 1 as any] })).toBe(false);
     });
   });
 
   describe("String expressions", () => {
-    it("calculates string length", () => {
-      expect(evaluate({ stringLength: "abc" })).toBe(3);
-      expect(evaluate({ stringLength: "abcdef" })).toBe(6);
-      expect(evaluate({ stringLength: "" })).toBe(0);
+    it("calculates string length", async () => {
+      expect(await evaluate({ stringLength: "abc" })).toBe(3);
+      expect(await evaluate({ stringLength: "abcdef" })).toBe(6);
+      expect(await evaluate({ stringLength: "" })).toBe(0);
     });
 
-    it("calculates string length when string is an expression", () => {
+    it("calculates string length when string is an expression", async () => {
       expect(
-        evaluate(
+        await evaluate(
           { stringLength: { get: "phrase" } },
           { self: { phrase: "Hello world" } }
         )
       ).toBe(11);
     });
 
-    it("joins strings", () => {
-      expect(evaluate({ joinStrings: ["a", "b", "c"] })).toEqual("abc");
-      expect(evaluate({ joinStrings: { strings: ["a", "b", "c"] } })).toEqual(
-        "abc"
-      );
-    });
-    it("joins strings with separator", () => {
+    it("joins strings", async () => {
+      expect(await evaluate({ joinStrings: ["a", "b", "c"] })).toEqual("abc");
       expect(
-        evaluate({
+        await evaluate({ joinStrings: { strings: ["a", "b", "c"] } })
+      ).toEqual("abc");
+    });
+    it("joins strings with separator", async () => {
+      expect(
+        await evaluate({
           joinStrings: {
             strings: ["The", "quick", "brown", "fox"],
             separator: " "
@@ -154,7 +161,7 @@ describe("Expression evaluator", () => {
       ).toEqual("The quick brown fox");
 
       expect(
-        evaluate({
+        await evaluate({
           joinStrings: {
             strings: ["a", "b", "c"],
             separator: { joinStrings: ["-"] }
@@ -162,13 +169,15 @@ describe("Expression evaluator", () => {
         })
       ).toEqual("a-b-c");
     });
-    it("joins strings where values are an expression", () => {
+    it("joins strings where values are an expression", async () => {
       expect(
-        evaluate({ joinStrings: ["X", { joinStrings: ["a", "b", "c"] }, "Y"] })
+        await evaluate({
+          joinStrings: ["X", { joinStrings: ["a", "b", "c"] }, "Y"]
+        })
       ).toBe("XabcY");
 
       expect(
-        evaluate(
+        await evaluate(
           { joinStrings: { get: "strings" } },
           { self: { strings: ["x", "y", "z"] } }
         )
@@ -177,31 +186,29 @@ describe("Expression evaluator", () => {
   });
 
   describe("Array operators", () => {
-    it("Evaluates `contains` operator", () => {
+    it("Evaluates `contains` operator", async () => {
       expect(
-        evaluate({
+        await evaluate({
           contains: { needle: "fin", haystack: ["fan", "fin", "foo"] }
         })
       ).toBe(true);
       expect(
-        evaluate({
+        await evaluate({
           contains: { needle: "fun", haystack: ["fan", "fin", "foo"] }
         })
       ).toBe(false);
     });
 
-    it("Throws an exception when `contains` types are incorrect", () => {
-      expect(() =>
-        evaluate({ contains: { needle: 6, haystack: ["1", "2", "3"] } })
-      ).toThrow();
-      expect(() =>
-        evaluate({ contains: { needle: 6, haystack: 7 } as any })
-      ).toThrow();
+    it("Throws an exception when `contains` types are incorrect", async () => {
+      await expectAllThrow([
+        { contains: { needle: 6, haystack: ["1", "2", "3"] } },
+        { contains: { needle: 6, haystack: 7 } }
+      ]);
     });
 
-    it("can evaluate `contains` on an array retrieved from context", () => {
+    it("can await evaluate `contains` on an array retrieved from context", async () => {
       expect(
-        evaluate(
+        await evaluate(
           {
             contains: {
               needle: "fin",
@@ -215,7 +222,7 @@ describe("Expression evaluator", () => {
       ).toBe(true);
 
       expect(
-        evaluate(
+        await evaluate(
           {
             contains: {
               needle: { get: "needle" },
@@ -231,18 +238,18 @@ describe("Expression evaluator", () => {
   });
 
   describe("Special forms and recursion", () => {
-    it("evaluates an if/then/else expression", () => {
+    it("evaluates an if/then/else expression", async () => {
       const trueExpression: Expression = { if: true, then: "Yes", else: "No" };
       const falseExpression: Expression = {
         if: false,
         then: "Yes",
         else: "No"
       };
-      expect(evaluate(trueExpression)).toEqual("Yes");
-      expect(evaluate(falseExpression)).toEqual("No");
+      expect(await evaluate(trueExpression)).toEqual("Yes");
+      expect(await evaluate(falseExpression)).toEqual("No");
     });
 
-    it("evaluates nested if/then/else expressions", () => {
+    it("evaluates nested if/then/else expressions", async () => {
       const nested: Expression = {
         if: true,
         then: {
@@ -267,28 +274,30 @@ describe("Expression evaluator", () => {
         }
       };
 
-      expect(evaluate(nested)).toEqual("Lose");
-      expect(evaluate(nested2)).toEqual("ON");
+      expect(await evaluate(nested)).toEqual("Lose");
+      expect(await evaluate(nested2)).toEqual("ON");
     });
   });
 
   describe("Property access", () => {
-    it("extracts properties from current object in context", () => {
+    it("extracts properties from current object in context", async () => {
       const ctx = { self: { species: "horse" } };
-      expect(evaluate({ get: { property: "species" } }, ctx)).toEqual("horse");
+      expect(await evaluate({ get: { property: "species" } }, ctx)).toEqual(
+        "horse"
+      );
     });
-    it("extracts property using shorthand syntax", () => {
+    it("extracts property using shorthand syntax", async () => {
       const ctx = { self: { species: "horse" } };
-      expect(evaluate({ get: "species" }, ctx)).toEqual("horse");
+      expect(await evaluate({ get: "species" }, ctx)).toEqual("horse");
     });
 
     // TODO: Is this the desired behavior or should we throw an error instead?
-    it("returns undefined if value does not exist", () => {
+    it("returns undefined if value does not exist", async () => {
       const ctx = { self: { species: "horse" } };
-      expect(evaluate({ get: "color" }, ctx)).toEqual(undefined);
+      expect(await evaluate({ get: "color" }, ctx)).toEqual(undefined);
     });
 
-    it("can use expression to define which property to get", () => {
+    it("can use expression to define which property to get", async () => {
       const ctx1 = { self: { species: "horse", speed: 100 } };
       const ctx2 = { self: { species: "hare", weight: 5 } };
 
@@ -306,56 +315,58 @@ describe("Expression evaluator", () => {
         }
       };
 
-      expect(evaluate(exp, ctx1)).toEqual(100);
-      expect(evaluate(exp, ctx2)).toEqual(5);
+      expect(await evaluate(exp, ctx1)).toEqual(100);
+      expect(await evaluate(exp, ctx2)).toEqual(5);
     });
 
-    it("evaluates `exists` expression", () => {
+    it("evaluates `exists` expression", async () => {
       const ctx = { self: { name: "ooo", bang: undefined } };
-      expect(evaluate({ exists: { property: "name" } }, ctx)).toBe(true);
-      expect(evaluate({ exists: { property: "bang" } }, ctx)).toBe(false);
-      expect(evaluate({ exists: { property: "lalala" } }, ctx)).toBe(false);
+      expect(await evaluate({ exists: { property: "name" } }, ctx)).toBe(true);
+      expect(await evaluate({ exists: { property: "bang" } }, ctx)).toBe(false);
+      expect(await evaluate({ exists: { property: "lalala" } }, ctx)).toBe(
+        false
+      );
     });
   });
 
   describe("Defined functions", () => {
-    it("evaluates a trivial function ", () => {
+    it("evaluates a trivial function ", async () => {
       const ctx = {
         functions: {
           PI: 3.14159
         }
       };
-      expect(evaluate({ PI: {} } as any, ctx)).toBe(3.14159);
+      expect(await evaluate({ PI: {} } as any, ctx)).toBe(3.14159);
     });
 
-    it("evaluates a trivial function with no arguments", () => {
+    it("evaluates a trivial function with no arguments", async () => {
       const ctx = {
         functions: {
           three: { "+": [1, 2] }
         }
       };
-      expect(evaluate({ three: {} } as any, ctx)).toBe(3);
+      expect(await evaluate({ three: {} } as any, ctx)).toBe(3);
     });
 
-    it("evaluates a defined function with array of arguments", () => {
+    it("evaluates a defined function with array of arguments", async () => {
       const ctx = {
         functions: {
           add: { "+": [{ $: 0 }, { $: 1 }] }
         }
       };
-      expect(evaluate({ add: [2, 3] } as any, ctx)).toBe(5);
+      expect(await evaluate({ add: [2, 3] } as any, ctx)).toBe(5);
     });
 
-    it("evaluates a defined function with named arguments", () => {
+    it("evaluates a defined function with named arguments", async () => {
       const ctx = {
         functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] }
         }
       };
-      expect(evaluate({ add: { A: 2, B: 3 } } as any, ctx)).toBe(5);
+      expect(await evaluate({ add: { A: 2, B: 3 } } as any, ctx)).toBe(5);
     });
 
-    it("evaluates nested defined functions with non-overlapping named arguments", () => {
+    it("evaluates nested defined functions with non-overlapping named arguments", async () => {
       const ctx = {
         functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] },
@@ -363,13 +374,13 @@ describe("Expression evaluator", () => {
         }
       };
       expect(
-        evaluate(
+        await evaluate(
           { add: { A: { subtract: { X: 10, Y: 8 } }, B: 3 } } as any,
           ctx
         )
       ).toBe(5);
     });
-    it("evaluates nested defined functions with overlapping named arguments", () => {
+    it("evaluates nested defined functions with overlapping named arguments", async () => {
       const ctx = {
         functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] },
@@ -377,29 +388,29 @@ describe("Expression evaluator", () => {
         }
       };
       expect(
-        evaluate(
+        await evaluate(
           { add: { A: { subtract: { A: 10, B: 8 } }, B: 3 } } as any,
           ctx
         )
       ).toBe(5);
     });
 
-    it("throws an error when trying to access missing argument", () => {
+    it("throws an error when trying to access missing argument", async () => {
       const ctx = {
         functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] }
         }
       };
-      expect(() => evaluate({ add: { A: 2 } } as any, ctx)).toThrow();
+      await expectAllThrow([{ add: { A: 2 } }], [ctx]);
     });
 
-    it("throws an error when argument is of wrong type", () => {
+    it("throws an error when argument is of wrong type", async () => {
       const ctx = {
         functions: {
           add: { "+": [{ $: "A" }, { $: "B" }] }
         }
       };
-      expect(() => evaluate({ add: { A: 2, B: "4" } } as any, ctx)).toThrow();
+      await expectAllThrow([{ add: { A: 2, B: "4" } }], [ctx]);
     });
   });
 });
@@ -414,3 +425,17 @@ describe("Expression evaluator", () => {
 //     ).toBe("and(#,true)");
 //   });
 // });
+
+// Test helper functions
+///////////////////////////////////////////////////////////////////////////////
+async function expectAllThrow(expressions: any[], contexts?: any[]) {
+  await Promise.all(
+    expressions.map(async (e, i) => {
+      // Syntax for expecting an error from an async function is kind of confusing.
+      // See https://jestjs.io/docs/en/asynchronous#async-await for more details
+      await expect(
+        evaluate(e, contexts && contexts[i] ? contexts[i] : undefined)
+      ).rejects.toThrow();
+    })
+  );
+}

@@ -8,6 +8,8 @@ import {
 } from "../types/";
 import evaluate from "../rules-engine/expression/";
 
+import { asyncForEach } from "../utilities";
+
 /** This function takes a list of effect definitions and evaluates their
  *  expressions in the given context. It does not actually perform the
  *  effects (such as sending e-mails) but it does output them in a format
@@ -20,23 +22,29 @@ import evaluate from "../rules-engine/expression/";
  *  to create a single logical history log event for an action with many
  *  granular effects.
  */
-export default function evaluateEffects(
+export default async function evaluateEffects(
   definition: EffectListDefinition,
   ctx: ExpressionContext
-): EffectResult[] {
+): Promise<EffectResult[]> {
   if (!Array.isArray(definition)) {
     throw new SyntaxError("Effects list must be an array.");
   }
 
   let out: EffectResult[] = [];
 
-  definition.forEach(e => {
+  await asyncForEach(definition, async e => {
     // Special case for conditional effect
     if (e.hasOwnProperty("effectIf") && e.hasOwnProperty("effects")) {
-      if (evaluate((e as ConditionalEffectDefinition).effectIf, ctx) === true) {
+      if (
+        (await evaluate((e as ConditionalEffectDefinition).effectIf, ctx)) ===
+        true
+      ) {
         out = [
           ...out,
-          ...evaluateEffects((e as ConditionalEffectDefinition).effects, ctx)
+          ...(await evaluateEffects(
+            (e as ConditionalEffectDefinition).effects,
+            ctx
+          ))
         ];
       }
       return;
@@ -53,13 +61,13 @@ export default function evaluateEffects(
 
         const params: { [key: string]: unknown } = {};
         for (const p in emailArgs.params) {
-          params[p] = evaluate(emailArgs.params[p], ctx);
+          params[p] = await evaluate(emailArgs.params[p], ctx);
         }
 
         out.push({
           type: "email",
-          to: $string(emailArgs.to, ctx),
-          template: $string(emailArgs.template, ctx),
+          to: await $string(emailArgs.to, ctx),
+          template: await $string(emailArgs.template, ctx),
           params,
           includeInHistory: !!emailArgs.includeInHistory
         });
@@ -80,7 +88,10 @@ export default function evaluateEffects(
         out.push({
           type: "update",
           properties: {
-            [$string(setArgs.property, ctx)]: evaluate(setArgs.value, ctx)
+            [await $string(setArgs.property, ctx)]: await evaluate(
+              setArgs.value,
+              ctx
+            )
           },
           on: { uid: ctx.self.uid, type: ctx.self.type },
           includeInHistory: !!setArgs.includeInHistory
