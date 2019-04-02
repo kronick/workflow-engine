@@ -17,7 +17,7 @@ export const switchSystem: SystemDefinition = {
           readPermissions: [{ roles: ["admin"], conditions: ["allow"] }, "deny"]
         }
       },
-      transitions: {
+      actions: {
         turnOn: {
           from: ["off", "turbo"],
           to: "on"

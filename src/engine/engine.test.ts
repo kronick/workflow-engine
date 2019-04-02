@@ -1,6 +1,6 @@
 import { SystemDefinition, User } from "../types";
 import { FakeInMemoryDataLoader } from "../dataLoader/index";
-import PGBusinessEngine, { DescribeTransitionsResult } from "./";
+import PGBusinessEngine, { DescribeActionsResult } from "./";
 import { MockEmailService, EmailService } from "../emailService/index";
 
 describe("Business engine", async () => {
@@ -123,55 +123,52 @@ describe("Business engine", async () => {
     });
   });
 
-  describe("State transitions", () => {
-    const includesAction = (
-      actionResults: DescribeTransitionsResult,
-      to: string
-    ) => actionResults.some(t => t.action === to);
+  describe("State actions", () => {
+    const includesAction = (actionResults: DescribeActionsResult, to: string) =>
+      actionResults.some(t => t.action === to);
 
-    it("Can describe the available transitions", async () => {
-      const transitions = await engine.describeTransitions({
+    it("Can describe the available actions", async () => {
+      const actions = await engine.describeActions({
         ...resource,
         asUser: regularUser
       });
 
-      expect(includesAction(transitions, "turnOn")).toBeTruthy();
-      expect(includesAction(transitions, "turnOff")).toBeFalsy();
+      expect(includesAction(actions, "turnOn")).toBeTruthy();
+      expect(includesAction(actions, "turnOff")).toBeFalsy();
     });
 
-    it("Enforces permissions on state transitions", async () => {
-      const transitionsForRegular = await engine.describeTransitions({
+    it("Enforces permissions on state actions", async () => {
+      const actionsForRegular = await engine.describeActions({
         ...resource,
         asUser: regularUser
       });
 
-      const transitionsForAdmin = await engine.describeTransitions({
+      const actionsForAdmin = await engine.describeActions({
         ...resource,
         asUser: adminUser
       });
 
       expect(
-        transitionsForRegular.filter(t => t.action === "turnOnTurbo")[0]
-          .possible
+        actionsForRegular.filter(t => t.action === "turnOnTurbo")[0].possible
       ).toBeTruthy();
       expect(
-        transitionsForAdmin.filter(t => t.action === "turnOnTurbo")[0].possible
+        actionsForAdmin.filter(t => t.action === "turnOnTurbo")[0].possible
       ).toBeTruthy();
 
       expect(
-        transitionsForRegular.filter(t => t.action === "turnOnTurbo")[0].allowed
+        actionsForRegular.filter(t => t.action === "turnOnTurbo")[0].allowed
       ).toBeFalsy();
       expect(
-        transitionsForAdmin.filter(t => t.action === "turnOnTurbo")[0].allowed
+        actionsForAdmin.filter(t => t.action === "turnOnTurbo")[0].allowed
       ).toBeTruthy();
 
-      // Transitions with conditions that depend on calculated properties
+      // Actions with conditions that depend on calculated properties
       expect(
-        transitionsForRegular.filter(t => t.action === "allowSecretSwitch")[0]
+        actionsForRegular.filter(t => t.action === "allowSecretSwitch")[0]
           .possible
       ).toBeTruthy();
       expect(
-        transitionsForRegular.filter(t => t.action === "denySecretSwitch")[0]
+        actionsForRegular.filter(t => t.action === "denySecretSwitch")[0]
           .possible
       ).toBeFalsy();
     });
@@ -376,7 +373,7 @@ const simpleSystem: SystemDefinition = {
           expression: { "+": [1, 2] }
         }
       },
-      transitions: {
+      actions: {
         turnOn: {
           from: ["off", "turbo"],
           to: "on",
@@ -421,20 +418,50 @@ const simpleSystem: SystemDefinition = {
           from: ["off"],
           to: "on",
           description:
-            "A transition with a condition that depends on a calculated value that should always be allowed.",
+            "A action with a condition that depends on a calculated value that should always be allowed.",
           conditions: [{ allowIf: { "=": [{ get: "secret" }, 3] } }]
         },
         denySecretSwitch: {
           from: ["off"],
           to: "on",
           description:
-            "A transition with a condition that depends on a calculated value that should never be allowed.",
+            "A action with a condition that depends on a calculated value that should never be allowed.",
           conditions: [{ allowIf: { "=": [{ get: "secret" }, 0] } }]
         }
       }
     }
   }
 };
+
+// const twoResourceSystem: SystemDefinition = {
+//   name: "Two Resource System",
+//   roles: ["regular", "admin", "anonymous"],
+//   resources: {
+//     Question: {
+//       states: ["open", "answered", "abandoned"],
+//       properties: {
+//         text: {
+//           type: "string"
+//         },
+//         answers: {
+//           type: {
+//             referenceTo: "Answer",
+//             constraints: ["CanHoldMany"]
+//           }
+//         }
+//       },
+//       actions: {
+//         provideAnswer: {
+//           from: ["open"],
+//           to: "answered"
+//         }
+//       }
+//     },
+//     Answer: {
+
+//     }
+//   }
+// };
 
 /** Test helper that will create a system with asingle `Switch` resource */
 async function createSimpleSystem(n: number = 1) {

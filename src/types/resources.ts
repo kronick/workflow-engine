@@ -63,8 +63,8 @@ export interface ResourceDefinition {
 
   states?: string[];
   defaultState?: string;
-  transitions?: {
-    [transition: string]: TransitionDefinition;
+  actions?: {
+    [action: string]: ActionDefinition;
   };
 
   readPermissions?: PermissionDefinition;
@@ -76,30 +76,30 @@ export interface ResourceDefinition {
   // TODO: Define resource-level read and write permissions
 }
 
-export interface TransitionDefinition {
-  /** Each transition can only specify one `to` state per defintion. */
-  to: string;
+export interface ActionDefinition {
+  /** Each action can only specify at most one `to` state. */
+  to?: string;
 
   /** For convenience, `from` states can be an array. */
   from: string | string[];
 
-  /** If `conditions` are not specified, the transition will always be allowed */
+  /** If `conditions` are not specified, the action will always be allowed */
   conditions?: ConditionDefinition;
 
-  /** An optional human-readable description of this transition */
+  /** An optional human-readable description of this action */
   description?: string;
 
   /** User permission definitions
-   *  A user can only perform this transition if and only if both the
+   *  A user can only perform this action if and only if both the
    *  `conditions` checks AND the `permissions` checks evaluate to `allow`.
    */
   permissions?: PermissionDefinition;
 
-  /** An optional list of effects to apply as a result of the transition. */
+  /** An optional list of effects to apply as a result of the action. */
   effects?: EffectListDefinition;
 
   /** A boolean or expression that will determine whether this action and any
-   *  associated state transition is logged in the resource's history
+   *  associated state action is logged in the resource's history
    */
   includeInHistory?: BooleanProducingExpression;
 }

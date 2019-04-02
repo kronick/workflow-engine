@@ -191,7 +191,7 @@ export const simpleDefinition: SystemDefinition = {
         }
       },
 
-      transitions: {
+      actions: {
         archive: {
           from: ["authoring", "reviewing", "revising", "approved"],
           to: "archived",
