@@ -3,13 +3,13 @@
 ## TODO:
 
 - [x] Derive calculated fields
+- [ ] Action definition (transitions without exit state?)
 - [ ] Automatic audit history log
 - [ ] References between resources
-- [ ] Decide if expressions need to be async (for loading references). Or use continuations?
+- [x] Decide if expressions need to be async (for loading references). Or use continuations?
 - [ ] DFS / Topo sort for calculated fields and references
 - [ ] Input objects to transitions &
       actions
-- [ ] Action definition (transitions without exit state?)
 - [ ] E-mails and other side effects in actions
 - [ ] Automatic role assignment (ball-in-court if a condition is met, etc)
 - [x] [Demo frontend](demo/README.md) (run engine client-side)
