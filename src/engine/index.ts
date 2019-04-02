@@ -4,7 +4,7 @@ import evaluateConditions from "../rules-engine/conditions";
 import evaluatePermissions from "../rules-engine/permissions";
 import evaluateExpression, { $boolean } from "../rules-engine/expression";
 import { ConditionResult } from "../rules-engine/conditions/index";
-import { TransitionDefinition, ResourceDefinition } from "../types/resources";
+import { ActionDefinition, ResourceDefinition } from "../types/resources";
 import { stdlibCtx } from "../rules-engine/expression/stdlib";
 import evaluateEffects, { EffectResult, UpdateEffectResult } from "../effects";
 import { EmailService } from "../emailService";
@@ -58,7 +58,7 @@ export type Result<TData, TDataKey extends string = "data"> = {
   errors: string[];
 };
 
-interface DescribeTransitionsParams {
+interface DescribeActionsParams {
   uid: string;
   type: string;
   asUser: User;
@@ -87,27 +87,27 @@ interface UpdateResourceParams {
   data: { [property: string]: unknown };
 }
 
-export type DescribeTransitionsResult = Array<{
+export type DescribeActionsResult = Array<{
   /** Target state */
   action: string;
 
-  /** Whether or not this transition is possible given its current state*/
+  /** Whether or not this action is possible given its current state*/
   possible: boolean;
 
-  /** Whether or not this transition is allowed for the requesting user */
+  /** Whether or not this action is allowed for the requesting user */
   allowed: boolean;
 
-  /** Reason this transition is not possible in its current state. */
+  /** Reason this action is not possible in its current state. */
   possibleReason?: string;
-  /** Reason this transition is not allowed for the requesting user. */
+  /** Reason this action is not allowed for the requesting user. */
   allowedReason?: string;
 }>;
 
-interface CanPerformTransitionParams {
+interface CanPerformActionParams {
   uid: string;
   type: string;
   asUser: User;
-  transition: string;
+  action: string;
 }
 
 export interface PerformActionParams {
@@ -132,18 +132,18 @@ interface BusinessEngine {
   // createResource(params: CreateResourceParams): Promise<UnknownResource>;
   // deleteResource(params: DeleteResourceParams): Promise<UnknownResource>;
 
-  /** Returns information about all defined transitions on the specified
-   *  resource. Will return all transitions whether currently possible
+  /** Returns information about all defined actions on the specified
+   *  resource. Will return all actions whether currently possible
    *  or allowed or not. Mostly useful for debugging and visualization.
    */
-  describeTransitions(
-    params: DescribeTransitionsParams
-  ): Promise<DescribeTransitionsResult>;
+  describeActions(
+    params: DescribeActionsParams
+  ): Promise<DescribeActionsResult>;
 
   /** Returns a boolean indicating whether the specified user can perform the
-   *  specified transition on the specified resource.
+   *  specified action on the specified resource.
    */
-  canPerformTransition(params: CanPerformTransitionParams): Promise<boolean>;
+  canPerformAction(params: CanPerformActionParams): Promise<boolean>;
 
   /** List the available resource types in the system */
   listResourceTypes(): string[];
@@ -317,7 +317,7 @@ export default class PGBusinessEngine implements BusinessEngine {
     if (permissions) {
       const result = await evaluatePermissions(permissions, asUser, ctx);
       if (result.decision === "deny") {
-        this._evaluateTransitionPermissions;
+        this._evaluateActionPermissions;
         if (result.reason) {
           return { history: undefined, errors: [result.reason] };
         }
@@ -381,14 +381,14 @@ export default class PGBusinessEngine implements BusinessEngine {
     return await this.getResource({ uid, type, asUser });
   }
 
-  async describeTransitions({
+  async describeActions({
     uid,
     type,
     asUser
-  }: DescribeTransitionsParams): Promise<DescribeTransitionsResult> {
-    const allTransitions = this.system.resources[type].transitions;
-    if (!allTransitions) {
-      throw new Error("This resource has no transitions defined.");
+  }: DescribeActionsParams): Promise<DescribeActionsResult> {
+    const allActions = this.system.resources[type].actions;
+    if (!allActions) {
+      throw new Error("This resource has no actions defined.");
     }
 
     const resource = await this._getRawResource({ uid, type, asUser });
@@ -396,13 +396,13 @@ export default class PGBusinessEngine implements BusinessEngine {
       throw new Error("The specified resource could not be found.");
     }
 
-    const result: DescribeTransitionsResult = [];
-    for (const t in allTransitions) {
-      const transition = allTransitions[t];
-      if (transition.from.includes(resource.state)) {
-        // Figure out if this transition is possible and/or allowed
-        const { possible, allowed } = await this._evaluateTransitionPermissions(
-          transition,
+    const result: DescribeActionsResult = [];
+    for (const t in allActions) {
+      const action = allActions[t];
+      if (action.from.includes(resource.state)) {
+        // Figure out if this action is possible and/or allowed
+        const { possible, allowed } = await this._evaluateActionPermissions(
+          action,
           resource,
           asUser
         );
@@ -420,30 +420,30 @@ export default class PGBusinessEngine implements BusinessEngine {
     return result;
   }
 
-  async _evaluateTransitionPermissions(
-    transition: TransitionDefinition,
+  async _evaluateActionPermissions(
+    action: ActionDefinition,
     resource: RawUnknownResource,
     asUser: User
   ) {
-    // Figure out if this transition is possible given its current state.
-    // If no conditions are specified, the transition is always possible.
-    const possible: ConditionResult = !transition.conditions
+    // Figure out if this action is possible given its current state.
+    // If no conditions are specified, the action is always possible.
+    const possible: ConditionResult = !action.conditions
       ? { decision: "allow" }
       : await evaluateConditions(
-          transition.conditions,
+          action.conditions,
           stdlibCtx({ self: resource })
         );
 
-    // Figure out if this transition is allowed given the current user.
-    // If no permissions are specified, the transition is always allowed
+    // Figure out if this action is allowed given the current user.
+    // If no permissions are specified, the action is always allowed
     // as long as it is possible.
     const allowed: ConditionResult =
       possible.decision === "deny"
         ? { decision: "deny", reason: possible.reason }
-        : !transition.permissions
+        : !action.permissions
         ? { decision: "allow" }
         : await evaluatePermissions(
-            transition.permissions,
+            action.permissions,
             asUser,
             stdlibCtx({ self: resource })
           );
@@ -451,18 +451,18 @@ export default class PGBusinessEngine implements BusinessEngine {
     return { possible, allowed };
   }
 
-  async canPerformTransition({
+  async canPerformAction({
     uid,
     type,
     asUser,
-    transition
-  }: CanPerformTransitionParams) {
-    const allTransitions = this.system.resources[type].transitions;
-    if (!allTransitions) {
-      throw new Error("This resource has no transitions defined.");
+    action
+  }: CanPerformActionParams) {
+    const allActions = this.system.resources[type].actions;
+    if (!allActions) {
+      throw new Error("This resource has no actions defined.");
     }
-    if (!allTransitions[transition]) {
-      throw new Error("That is not a valid transition for this resource.");
+    if (!allActions[action]) {
+      throw new Error("That is not a valid action for this resource.");
     }
 
     const resource = await this._getRawResource({ uid, type, asUser });
@@ -470,12 +470,12 @@ export default class PGBusinessEngine implements BusinessEngine {
       throw new Error("The specified resource could not be found.");
     }
 
-    if (!allTransitions[transition].from.includes(resource.state)) {
+    if (!allActions[action].from.includes(resource.state)) {
       return false;
     }
 
-    const { allowed } = await this._evaluateTransitionPermissions(
-      allTransitions[transition],
+    const { allowed } = await this._evaluateActionPermissions(
+      allActions[action],
       resource,
       asUser
     );
@@ -496,7 +496,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       return { success: false, errors: [`Resource not found.`] };
     }
 
-    const allActions = resourceDef.transitions;
+    const allActions = resourceDef.actions;
     if (!allActions || allActions[action] === undefined) {
       return { success: false, errors: [`Invalid action: \`${action}\`.`] };
     }
@@ -509,7 +509,7 @@ export default class PGBusinessEngine implements BusinessEngine {
 
     const ctx = stdlibCtx({ self: { ...rawResult, uid, type } });
 
-    const { allowed } = await this._evaluateTransitionPermissions(
+    const { allowed } = await this._evaluateActionPermissions(
       actionDef,
       rawResult,
       asUser

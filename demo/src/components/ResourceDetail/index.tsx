@@ -1,9 +1,6 @@
 import React from "react";
 import { ResourceData } from "../WorkflowDemoApp";
-import {
-  PGBusinessEngine,
-  DescribeTransitionsResult
-} from "pg-workflow-engine";
+import { PGBusinessEngine, DescribeActionsResult } from "pg-workflow-engine";
 import { PropertyTypeDefinition, User } from "pg-workflow-engine/dist/types";
 
 import HistoryLog from "../HistoryLog";
@@ -22,7 +19,7 @@ interface ResourceDetailProps {
 
 interface ResourceDetailState {
   editedResource?: ResourceData | null;
-  stateTransitions: DescribeTransitionsResult | null;
+  actions: DescribeActionsResult | null;
   hasError?: boolean;
 }
 
@@ -34,12 +31,12 @@ export default class ResourceDetail extends React.Component<
     super(props);
     this.state = {
       editedResource: this.props.resource,
-      stateTransitions: null
+      actions: null
     };
   }
 
   componentDidMount() {
-    this.fetchStateTransitions();
+    this.fetchStateActions();
   }
 
   componentDidUpdate(prevProps: ResourceDetailProps) {
@@ -48,20 +45,20 @@ export default class ResourceDetail extends React.Component<
       this.props.engine !== prevProps.engine ||
       this.props.user !== prevProps.user
     ) {
-      this.fetchStateTransitions();
+      this.fetchStateActions();
     }
   }
 
-  fetchStateTransitions = async () => {
+  fetchStateActions = async () => {
     if (!this.props.resource || !this.props.user) return;
 
-    const result = await this.props.engine.describeTransitions({
+    const result = await this.props.engine.describeActions({
       uid: this.props.resource.uid,
       type: this.props.resource.type,
       asUser: this.props.user
     });
 
-    this.setState({ stateTransitions: result });
+    this.setState({ actions: result });
   };
 
   handleAction = async (action: string) => {
@@ -140,8 +137,8 @@ export default class ResourceDetail extends React.Component<
               />
             ) : null}
 
-            {this.state.stateTransitions
-              ? this.state.stateTransitions.map(t => (
+            {this.state.actions
+              ? this.state.actions.map(t => (
                   <ActionDetail onAction={this.handleAction} action={t} />
                 ))
               : null}
@@ -207,7 +204,7 @@ const PropertyEditor: React.SFC<{
 };
 
 const ActionDetail: React.SFC<{
-  action: DescribeTransitionsResult[0];
+  action: DescribeActionsResult[0];
   onAction: (actionName: string, data: unknown | null) => void;
 }> = props => {
   let disabled = false;
