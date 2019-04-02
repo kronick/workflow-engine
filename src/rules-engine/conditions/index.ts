@@ -25,10 +25,10 @@ export interface ConditionResult {
  *  The message of an `allowIf` statement will only be returned if it is the
  *  final condition and its expression evaluates to `false`.
  */
-export default function evaluateConditions(
+export default async function evaluateConditions(
   def: ConditionDefinition,
   ctx: ExpressionContext = { self: null }
-): ConditionResult {
+): Promise<ConditionResult> {
   // Validate all up front
   def.forEach(c => {
     if (!validateConditionDefinition(c)) throw new InvalidCondition(c);
@@ -48,7 +48,7 @@ export default function evaluateConditions(
       return { decision: "deny", reason: d.denyWithMessage };
     }
     if (isAllowIf(d)) {
-      const result = evaluateExpression(d.allowIf, ctx);
+      const result = await evaluateExpression(d.allowIf, ctx);
       if (typeof result !== "boolean") throw new ConditionTypeError(d);
 
       if (result) {
@@ -58,7 +58,7 @@ export default function evaluateConditions(
       lastConditionType = "allow";
     }
     if (isDenyIf(d)) {
-      const result = evaluateExpression(d.denyIf, ctx);
+      const result = await evaluateExpression(d.denyIf, ctx);
       if (typeof result !== "boolean") throw new ConditionTypeError(d);
 
       if (result) {

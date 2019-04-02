@@ -1,12 +1,12 @@
 import evaluateEffects, { EmailEffectResult, UpdateEffectResult } from "./";
 
 describe("Effects evaluator", () => {
-  it("Outputs empty result for empty effects list", () => {
-    expect(evaluateEffects([], {})).toEqual([]);
+  it("Outputs empty result for empty effects list", async () => {
+    expect(await evaluateEffects([], {})).toEqual([]);
   });
 
-  it("Outputs result from a single email effect", () => {
-    const result = evaluateEffects(
+  it("Outputs result from a single email effect", async () => {
+    const result = await evaluateEffects(
       [
         {
           sendEmail: {
@@ -24,8 +24,26 @@ describe("Effects evaluator", () => {
     expect((result[0] as EmailEffectResult).to).toBe("example@example.com");
   });
 
-  it("Outputs result with multiple effects", () => {
-    const result = evaluateEffects(
+  it("Does not mutate input when evaluating `set` effect", async () => {
+    const obj = { zing: 0 };
+    const result = await evaluateEffects(
+      [
+        {
+          set: {
+            property: "zing",
+            value: 10
+          }
+        }
+      ],
+      { self: obj }
+    );
+
+    expect(obj.zing).toBe(0);
+    expect(result.length).toBe(1);
+  });
+
+  it("Outputs result with multiple effects", async () => {
+    const result = await evaluateEffects(
       [
         {
           sendEmail: {
@@ -41,7 +59,7 @@ describe("Effects evaluator", () => {
           }
         }
       ],
-      {}
+      { self: { zing: 0 } }
     );
 
     expect(result.length).toBe(2);
@@ -51,8 +69,8 @@ describe("Effects evaluator", () => {
     expect((result[1] as UpdateEffectResult).properties["zing"]).toBe(10);
   });
 
-  it("Outputs result with evaluated expressions", () => {
-    const result = evaluateEffects(
+  it("Outputs result with evaluated expressions", async () => {
+    const result = await evaluateEffects(
       [
         {
           sendEmail: {
@@ -73,8 +91,8 @@ describe("Effects evaluator", () => {
     expect((result[0] as EmailEffectResult).to).toBe("example@example.com");
   });
 
-  it("Conditionally outputs effects", () => {
-    const result = evaluateEffects(
+  it("Conditionally outputs effects", async () => {
+    const result = await evaluateEffects(
       [
         {
           // This conditional effect's expression will evaluate to false

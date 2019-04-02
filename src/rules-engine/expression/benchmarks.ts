@@ -23,22 +23,22 @@ const buildSumString = (depth: number): string => {
   return `(${branch} + ${branch})`;
 };
 
-export default function run() {
+export default async function run() {
   const nested = buildSumTree(10);
   const singleSided = buildSingleSidedSumTree(1024);
   const sumAsString = buildSumString(10);
   //console.log(sumAsString);
 
   console.time("Evaluate deeply nested expression");
-  evaluate(nested);
+  await evaluate(nested);
   console.timeEnd("Evaluate deeply nested expression");
 
   console.time("Evaluate deeply nested expression (single sided)");
-  evaluate(singleSided);
+  await evaluate(singleSided);
   console.timeEnd("Evaluate deeply nested expression (single sided)");
 
   console.time("Evaluate deeply nested expression (100x)");
-  for (let i = 0; i < 100; i++) evaluate(nested);
+  for (let i = 0; i < 100; i++) await evaluate(nested);
   console.timeEnd("Evaluate deeply nested expression (100x)");
 
   console.time("Native eval long expression");

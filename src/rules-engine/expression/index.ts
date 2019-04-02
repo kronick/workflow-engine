@@ -18,10 +18,10 @@ export interface ExpressionContext {
   // TODO: Need to store and mark nodes to detect circular references
 }
 
-export default function e(
+export default async function e(
   expression: Expression,
   context: ExpressionContext = { self: null }
-): ExpressionResult {
+): Promise<ExpressionResult> {
   try {
     // Push current expression onto the stack
     if (!context.stack) {
@@ -54,7 +54,7 @@ export default function e(
       keys.includes("then") &&
       keys.includes("else")
     ) {
-      return evaluateIf(expression as IfExpression, context);
+      return await evaluateIf(expression as IfExpression, context);
     }
 
     // Any other valid expression should have only one key that represents the operator
@@ -72,37 +72,43 @@ export default function e(
     if (!operatorMap[op]) {
       // Look in context for custom function with this operator
       if (context.functions && context.functions[op]) {
-        return useDefinition(op, args, context);
+        return await useDefinition(op, args, context);
       }
       throw new InvalidOperator(op);
     }
 
-    return operatorMap[op](args, context);
+    return await operatorMap[op](args, context);
   } catch (e) {
     e.message += stackTrace(context.stack);
     throw e;
   }
 }
 
-function evaluateIf(expression: IfExpression, context: ExpressionContext) {
-  if ($boolean(expression.if, context)) {
-    return e(expression.then, context);
+async function evaluateIf(
+  expression: IfExpression,
+  context: ExpressionContext
+) {
+  if (await $boolean(expression.if, context)) {
+    return await e(expression.then, context);
   } else {
-    return e(expression.else, context);
+    return await e(expression.else, context);
   }
 }
 
-function useDefinition(
+/** Try to evaluate a function by using a custom definition pulled from the
+ *  expression context.
+ */
+async function useDefinition(
   op: string,
   args: any,
   context: ExpressionContext
-): ExpressionResult {
+): Promise<ExpressionResult> {
   const def = context.functions![op];
 
   // Put argument values into context's closure
   context = { ...context, closures: { ...context.closures, ...args } };
   try {
-    return e(def, context);
+    return await e(def, context);
   } catch (e) {
     // Augment "MissingArgument" error with name of this defined function
     if (e.name === "MissingArgument") {
@@ -119,54 +125,67 @@ function useDefinition(
 }
 
 interface OperatorMap {
-  [op: string]: (args: any, context: ExpressionContext) => ExpressionResult;
+  [op: string]: (
+    args: any,
+    context: ExpressionContext
+  ) => Promise<ExpressionResult>;
 }
 
 /** Map of operators to their native functions */
 const operatorMap: OperatorMap = {
-  and: ([A, B], ctx) => $boolean(A, ctx) && $boolean(B, ctx),
-  or: ([A, B], ctx) =>
-    $boolean(A, ctx) ? true : $boolean(B, ctx) ? true : false,
-  not: (E, ctx) => !$boolean(E, ctx),
+  and: async ([A, B], ctx) =>
+    (await $boolean(A, ctx)) && (await $boolean(B, ctx)),
+  or: async ([A, B], ctx) =>
+    (await $boolean(A, ctx)) ? true : (await $boolean(B, ctx)) ? true : false,
+  not: async (E, ctx) => !(await $boolean(E, ctx)),
 
-  ">": ([A, B], ctx) => $number(A, ctx) > $number(B, ctx),
-  "<": ([A, B], ctx) => $number(A, ctx) < $number(B, ctx),
-  "=": ([A, B], ctx) => $number(A, ctx) === $number(B, ctx),
-  "+": ([A, B], ctx) => $number(A, ctx) + $number(B, ctx),
-  "-": ([A, B], ctx) => $number(A, ctx) - $number(B, ctx),
-  "*": ([A, B], ctx) => $number(A, ctx) * $number(B, ctx),
-  "/": ([A, B], ctx) => $number(A, ctx) / $number(B, ctx),
-  "%": ([A, B], ctx) => $number(A, ctx) % $number(B, ctx),
-  pow: ([A, B], ctx) => Math.pow($number(A, ctx), $number(B, ctx)),
+  ">": async ([A, B], ctx) => (await $number(A, ctx)) > (await $number(B, ctx)),
+  "<": async ([A, B], ctx) => (await $number(A, ctx)) < (await $number(B, ctx)),
+  "=": async ([A, B], ctx) =>
+    (await $number(A, ctx)) === (await $number(B, ctx)),
+  "+": async ([A, B], ctx) => (await $number(A, ctx)) + (await $number(B, ctx)),
+  "-": async ([A, B], ctx) => (await $number(A, ctx)) - (await $number(B, ctx)),
+  "*": async ([A, B], ctx) => (await $number(A, ctx)) * (await $number(B, ctx)),
+  "/": async ([A, B], ctx) => (await $number(A, ctx)) / (await $number(B, ctx)),
+  "%": async ([A, B], ctx) => (await $number(A, ctx)) % (await $number(B, ctx)),
+  pow: async ([A, B], ctx) =>
+    Math.pow(await $number(A, ctx), await $number(B, ctx)),
 
-  eq: ([A, B], ctx) => $string(A, ctx) === $string(B, ctx),
+  eq: async ([A, B], ctx) =>
+    (await $string(A, ctx)) === (await $string(B, ctx)),
 
-  exists: ({ property, from }, ctx) => {
+  exists: async ({ property, from }, ctx) => {
     if (from) throw new NotImplemented("exists from");
     if (!ctx.self) throw new ExpressionTypeError("self", null);
 
     return ctx.self[property] !== undefined;
   },
 
-  stringLength: (string, ctx) => {
-    return $string(string, ctx).length;
+  stringLength: async (string, ctx) => {
+    return (await $string(string, ctx)).length;
   },
 
   /** Join an array of strings with an optional separator */
-  joinStrings: (args, ctx) => {
+  joinStrings: async (args, ctx) => {
     let strings: string[];
     let separator: string;
     if (Array.isArray(args)) {
       // Strings to join are specified in an array
-      strings = args.map(el => $string(el, ctx));
+      strings = await Promise.all(args.map(async el => await $string(el, ctx)));
       separator = "";
     } else if (args.strings) {
       // Strings to join are specified in an object
-      strings = $array(args.strings, ctx).map(el => $string(el, ctx));
-      separator = $string(args.separator || "", ctx);
+      strings = await Promise.all(
+        (await $array(args.strings, ctx)).map(
+          async el => await $string(el, ctx)
+        )
+      );
+      separator = await $string(args.separator || "", ctx);
     } else {
       // Strings to join must be a string-producing expression
-      strings = $array(args, ctx).map(el => $string(el, ctx));
+      strings = await Promise.all(
+        (await $array(args, ctx)).map(async el => await $string(el, ctx))
+      );
       separator = "";
     }
 
@@ -175,15 +194,17 @@ const operatorMap: OperatorMap = {
 
   /** Returns a boolean indicating whether the `needle` object occurs in the
    *  `haystack` array */
-  contains: ({ needle, haystack }, ctx) => {
+  contains: async ({ needle, haystack }, ctx) => {
     if (needle === undefined || haystack === undefined) {
       throw new SyntaxError(
         "'contains' expression requires both a 'needle' and a 'haystack' parameter"
       );
     }
 
-    haystack = $array(haystack, ctx).map(el => e(el, ctx));
-    needle = e(needle, ctx);
+    haystack = await Promise.all(
+      (await $array(haystack, ctx)).map(async el => await e(el, ctx))
+    );
+    needle = await e(needle, ctx);
     const firstType = typeof haystack[0];
     if (haystack.some((a: unknown) => typeof a !== firstType)) {
       // TODO: This should be a different exception
@@ -201,12 +222,12 @@ const operatorMap: OperatorMap = {
    *  in the context's `self` property.
    *  If the `from` argument is specified, this function reads
    */
-  get: (args, ctx) => {
+  get: async (args, ctx) => {
     let property, from;
     if (typeof args === "string") {
       property = args;
     } else {
-      property = $string(args.property, ctx);
+      property = await $string(args.property, ctx);
       from = args.from;
     }
 
@@ -217,17 +238,17 @@ const operatorMap: OperatorMap = {
   },
 
   /** This function access an argument set in a lambda / defined function */
-  $: (name: string | number, ctx) => {
+  $: async (name: string | number, ctx) => {
     if (!ctx.closures || !ctx.closures.hasOwnProperty(name))
       throw new MissingArgument(name);
-    return e(ctx.closures[name], ctx);
+    return await e(ctx.closures[name], ctx);
   }
 };
 
 /** Evaluate an expression and expect a number as a return value.
  *  Throws an error if it is any other type */
-export function $number(n: any, ctx: ExpressionContext) {
-  const evaluated = e(n, ctx);
+export async function $number(n: any, ctx: ExpressionContext) {
+  const evaluated = await e(n, ctx);
   if (typeof evaluated !== "number")
     throw new ExpressionTypeError("number", evaluated);
 
@@ -236,8 +257,8 @@ export function $number(n: any, ctx: ExpressionContext) {
 
 /** Evaluate an expression and expect a string as a return value.
  *  Throws an error if it is any other type */
-export function $string(n: any, ctx: ExpressionContext) {
-  const evaluated = e(n, ctx);
+export async function $string(n: any, ctx: ExpressionContext) {
+  const evaluated = await e(n, ctx);
   if (typeof evaluated !== "string")
     throw new ExpressionTypeError("string", evaluated);
 
@@ -246,8 +267,8 @@ export function $string(n: any, ctx: ExpressionContext) {
 
 /** Evaluate an expression and expect a boolean as a return value.
  *  Throws an error if it is any other type */
-export function $boolean(n: any, ctx: ExpressionContext) {
-  const evaluated = e(n, ctx);
+export async function $boolean(n: any, ctx: ExpressionContext) {
+  const evaluated = await e(n, ctx);
   if (typeof evaluated !== "boolean")
     throw new ExpressionTypeError("boolean", evaluated);
 
@@ -256,8 +277,8 @@ export function $boolean(n: any, ctx: ExpressionContext) {
 
 /** Evaluate an expression and expect an array as a return value.
  *  Throws an error if it is any other type */
-export function $array(n: any, ctx: ExpressionContext) {
-  const evaluated = e(n, ctx);
+export async function $array(n: any, ctx: ExpressionContext) {
+  const evaluated = await e(n, ctx);
   if (!Array.isArray(evaluated))
     throw new ExpressionTypeError("array", evaluated);
 

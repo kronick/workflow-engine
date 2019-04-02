@@ -14,11 +14,11 @@ import evaluateExpression, {
 } from "../expression";
 import evaluateConditions, { ConditionResult } from "../conditions";
 
-export default function evaluatePermissions(
+export default async function evaluatePermissions(
   def: PermissionDefinition,
   user: User,
   ctx: ExpressionContext = {}
-): ConditionResult {
+): Promise<ConditionResult> {
   // Loop through each of the permissions definitions
   // If `user.role` matches the `roles` for a given definition,
   // evaluate the `conditions` to determine whether the user is permitted
@@ -80,7 +80,7 @@ export default function evaluatePermissions(
       // Evaluate conditions
       // TODO: Pass user into conditions context so it can be used in
       // when evaluating expressions.
-      return evaluateConditions(d.conditions, { ...ctx, user });
+      return await evaluateConditions(d.conditions, { ...ctx, user });
     }
   }
   return { decision: "deny", reason: "Access denied." };

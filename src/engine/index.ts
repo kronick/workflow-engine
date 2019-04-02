@@ -219,7 +219,7 @@ export default class PGBusinessEngine implements BusinessEngine {
 
     return {
       ...rawResult,
-      ...this._calculateProperties(resourceDef, rawResult)
+      ...(await this._calculateProperties(resourceDef, rawResult))
     };
   }
 
@@ -241,9 +241,8 @@ export default class PGBusinessEngine implements BusinessEngine {
     // Enforce resource-level read permissions
     const permissions = this.system.resources[type].readPermissions;
     if (permissions) {
-      const result = evaluatePermissions(permissions, asUser, ctx);
+      const result = await evaluatePermissions(permissions, asUser, ctx);
       if (result.decision === "deny") {
-        this._evaluateTransitionPermissions;
         if (result.reason) {
           return { resource: undefined, errors: [result.reason] };
         }
@@ -275,7 +274,7 @@ export default class PGBusinessEngine implements BusinessEngine {
 
       if (section[property].readPermissions) {
         const perms = section[property].readPermissions;
-        const result = evaluatePermissions(perms!, asUser, ctx);
+        const result = await evaluatePermissions(perms!, asUser, ctx);
         if (result.decision === "allow") {
           visibleResult[property] = { value: rawResult[property], errors: [] };
         } else {
@@ -316,7 +315,7 @@ export default class PGBusinessEngine implements BusinessEngine {
     // Enforce resource-level read permissions
     const permissions = this.system.resources[type].readPermissions;
     if (permissions) {
-      const result = evaluatePermissions(permissions, asUser, ctx);
+      const result = await evaluatePermissions(permissions, asUser, ctx);
       if (result.decision === "deny") {
         this._evaluateTransitionPermissions;
         if (result.reason) {
@@ -339,10 +338,10 @@ export default class PGBusinessEngine implements BusinessEngine {
     }
   }
 
-  _calculateProperties(
+  async _calculateProperties(
     resourceDef: ResourceDefinition,
     rawResult: UnknownResourceData
-  ): { [key: string]: unknown } {
+  ): Promise<{ [key: string]: unknown }> {
     const ctx = stdlibCtx({ self: rawResult });
 
     if (!resourceDef.calculatedProperties) {
@@ -358,7 +357,7 @@ export default class PGBusinessEngine implements BusinessEngine {
 
       // TODO: This needs to be re-written to handle calculated properties that
       // reference other calculated props.
-      out[name] = evaluateExpression(expr, ctx);
+      out[name] = await evaluateExpression(expr, ctx);
     }
 
     return out;
@@ -402,7 +401,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       const transition = allTransitions[t];
       if (transition.from.includes(resource.state)) {
         // Figure out if this transition is possible and/or allowed
-        const { possible, allowed } = this._evaluateTransitionPermissions(
+        const { possible, allowed } = await this._evaluateTransitionPermissions(
           transition,
           resource,
           asUser
@@ -421,7 +420,7 @@ export default class PGBusinessEngine implements BusinessEngine {
     return result;
   }
 
-  _evaluateTransitionPermissions(
+  async _evaluateTransitionPermissions(
     transition: TransitionDefinition,
     resource: RawUnknownResource,
     asUser: User
@@ -430,7 +429,7 @@ export default class PGBusinessEngine implements BusinessEngine {
     // If no conditions are specified, the transition is always possible.
     const possible: ConditionResult = !transition.conditions
       ? { decision: "allow" }
-      : evaluateConditions(
+      : await evaluateConditions(
           transition.conditions,
           stdlibCtx({ self: resource })
         );
@@ -443,7 +442,7 @@ export default class PGBusinessEngine implements BusinessEngine {
         ? { decision: "deny", reason: possible.reason }
         : !transition.permissions
         ? { decision: "allow" }
-        : evaluatePermissions(
+        : await evaluatePermissions(
             transition.permissions,
             asUser,
             stdlibCtx({ self: resource })
@@ -475,7 +474,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       return false;
     }
 
-    const { allowed } = this._evaluateTransitionPermissions(
+    const { allowed } = await this._evaluateTransitionPermissions(
       allTransitions[transition],
       resource,
       asUser
@@ -510,7 +509,7 @@ export default class PGBusinessEngine implements BusinessEngine {
 
     const ctx = stdlibCtx({ self: { ...rawResult, uid, type } });
 
-    const { allowed } = this._evaluateTransitionPermissions(
+    const { allowed } = await this._evaluateTransitionPermissions(
       actionDef,
       rawResult,
       asUser
@@ -525,7 +524,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       // history event.
       const includeInHistory =
         actionDef.includeInHistory !== undefined
-          ? $boolean(actionDef.includeInHistory, ctx)
+          ? await $boolean(actionDef.includeInHistory, ctx)
           : false;
 
       // If there is a `to` state specified, create a `update` effect
@@ -541,8 +540,8 @@ export default class PGBusinessEngine implements BusinessEngine {
 
       // If there are other effects defined, evaluate those
       if (actionDef.effects) {
-        evaluateEffects(actionDef.effects, ctx);
-        effects.push(...evaluateEffects(actionDef.effects, ctx));
+        await evaluateEffects(actionDef.effects, ctx);
+        effects.push(...(await evaluateEffects(actionDef.effects, ctx)));
       }
 
       // Now that all effects have been evaluated, execute them
