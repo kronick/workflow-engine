@@ -192,6 +192,17 @@ export const simpleDefinition: SystemDefinition = {
       },
 
       actions: {
+        editDocument: {
+          from: ["authoring", "revising"],
+          conditions: ["allow"],
+          permissions: [
+            {
+              roles: ["author"],
+              conditions: ["allow"]
+            },
+            { denyWithMessage: "Only authors can edit the document." }
+          ]
+        },
         archive: {
           from: ["authoring", "reviewing", "revising", "approved"],
           to: "archived",

@@ -8,8 +8,9 @@
 - [ ] References between resources
 - [x] Decide if expressions need to be async (for loading references). Or use continuations?
 - [ ] DFS / Topo sort for calculated fields and references
-- [ ] Input objects to transitions &
-      actions
+- [x] Input objects to transitions & actions
+- [x] Input validation on actions
+- [ ] Refactor input validation to specify field that error should be reported on
 - [ ] E-mails and other side effects in actions
 - [ ] Automatic role assignment (ball-in-court if a condition is met, etc)
 - [x] [Demo frontend](demo/README.md) (run engine client-side)
@@ -17,7 +18,6 @@
 - [ ] Custom functions in system definition -> expression context
 - [ ] User objects in expressions
 - [ ] updateResource
-- [ ] Input validation on updates, transitions, actions
 - [ ] i18n strings (for error messages or otherwise)
 - [ ] Visibility control (allow / deny / _hide_ ?) for properties and objects
 - [x] Per-resource read permissions
@@ -97,7 +97,6 @@ Something like this?
     },
     "validation": [
       {
-        "reportOnField": "text",
         "invalidIf": {
           ">": [
             {
@@ -112,7 +111,8 @@ Something like this?
             }
           ]
         },
-        "invalidMessage": "Document text must be longer than the title."
+        "invalidMessage": "Document text must be longer than the title.",
+        "reportOnFields": ["text", "title"]
       }
     ]
   }

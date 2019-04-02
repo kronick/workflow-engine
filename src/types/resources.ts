@@ -102,6 +102,29 @@ export interface ActionDefinition {
    *  associated state action is logged in the resource's history
    */
   includeInHistory?: BooleanProducingExpression;
+
+  input?: InputDefinition;
+}
+
+export interface InputDefinition {
+  fields: Record<string, InputField>;
+
+  /** Whole-input validation rules. Used to express validation dependencies
+   *  between input fields.
+   *
+   *  These rules are executed in order after each individual field is
+   *  validated.
+   */
+  validation?: ConditionDefinition;
+}
+
+export interface InputField {
+  type: PropertyTypeDefinition;
+
+  required?: boolean;
+
+  /** Validation rules for this input field */
+  validation?: ConditionDefinition;
 }
 
 // Effects

@@ -21,7 +21,7 @@ export interface ConditionResult {
  *  to present a human-readable reason if the condition is denied.
  *
  *  This function not only evaluates each condition in order, but it figures
- *  out which `denyMessage` (if any) is approprriate to return to the caller.
+ *  out which `denyMessage` (if any) is appropriate to return to the caller.
  *  The message of an `allowIf` statement will only be returned if it is the
  *  final condition and its expression evaluates to `false`.
  */

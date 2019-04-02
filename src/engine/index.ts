@@ -2,9 +2,16 @@ import { SystemDefinition, User } from "../types/";
 import { DataLoader, UnknownResourceData, HistoryEvent } from "../dataLoader";
 import evaluateConditions from "../rules-engine/conditions";
 import evaluatePermissions from "../rules-engine/permissions";
-import evaluateExpression, { $boolean } from "../rules-engine/expression";
+import evaluateExpression, {
+  $boolean,
+  ExpressionContext
+} from "../rules-engine/expression";
 import { ConditionResult } from "../rules-engine/conditions/index";
-import { ActionDefinition, ResourceDefinition } from "../types/resources";
+import {
+  ActionDefinition,
+  ResourceDefinition,
+  InputDefinition
+} from "../types/resources";
 import { stdlibCtx } from "../rules-engine/expression/stdlib";
 import evaluateEffects, { EffectResult, UpdateEffectResult } from "../effects";
 import { EmailService } from "../emailService";
@@ -91,6 +98,8 @@ export type DescribeActionsResult = Array<{
   /** Target state */
   action: string;
 
+  input?: InputDefinition;
+
   /** Whether or not this action is possible given its current state*/
   possible: boolean;
 
@@ -115,7 +124,7 @@ export interface PerformActionParams {
   type: string;
   action: string;
   asUser: User;
-  input?: unknown;
+  input?: Record<string, unknown>;
 }
 
 export type PerformActionResult = Result<boolean, "success">;
@@ -409,6 +418,7 @@ export default class PGBusinessEngine implements BusinessEngine {
 
         result.push({
           action: t,
+          input: allActions[t].input,
           possible: possible.decision === "allow",
           possibleReason: possible.reason,
           allowed: allowed.decision === "allow",
@@ -483,6 +493,65 @@ export default class PGBusinessEngine implements BusinessEngine {
     return allowed.decision === "allow";
   }
 
+  // TODO: This should probably be refactored out into its own module
+  async _validateInput(
+    actionDefinition: ActionDefinition,
+    ctx: ExpressionContext
+  ): Promise<string[]> {
+    // Don't validate if there is no input definition on this action
+    if (!actionDefinition.input) return [];
+
+    // We can collect more than one error while validating input, so store
+    // output as an array.
+    const errors = [];
+
+    // Validate each field in the input definition
+    for (let field in actionDefinition.input.fields) {
+      try {
+        const fieldDef = actionDefinition.input.fields[field];
+
+        // Check that fields marked as required are included in the input
+        if (fieldDef.required && (!ctx.input || !ctx.input[field])) {
+          errors.push(`Field '${field}' is required.`);
+          continue;
+        }
+
+        // Use the condition evaluator to decide if this field passes validation
+        const possible: ConditionResult = !fieldDef.validation
+          ? { decision: "allow" }
+          : await evaluateConditions(fieldDef.validation, ctx);
+
+        if (possible.decision === "deny") {
+          errors.push(
+            possible.reason || `Field '${field}' did not pass validation.`
+          );
+        }
+      } catch (e) {
+        errors.push(e);
+        console.error(e, ctx);
+      }
+    }
+
+    if (actionDefinition.input.validation) {
+      try {
+        const validationResult = await evaluateConditions(
+          actionDefinition.input.validation,
+          ctx
+        );
+        if (validationResult.decision === "deny") {
+          errors.push(
+            validationResult.reason || "Input did not pass validation."
+          );
+        }
+      } catch (e) {
+        errors.push(e);
+        console.error(e, ctx);
+      }
+    }
+
+    return errors;
+  }
+
   async performAction({
     uid,
     type,
@@ -507,7 +576,9 @@ export default class PGBusinessEngine implements BusinessEngine {
       return { success: false, errors: [`Resource not found.`] };
     }
 
-    const ctx = stdlibCtx({ self: { ...rawResult, uid, type } });
+    // Build a context with all the standard library methods, the current raw
+    // resource, and the input values
+    const ctx = stdlibCtx({ self: { ...rawResult, uid, type }, input });
 
     const { allowed } = await this._evaluateActionPermissions(
       actionDef,
@@ -516,6 +587,12 @@ export default class PGBusinessEngine implements BusinessEngine {
     );
 
     if (allowed.decision === "allow") {
+      // Validate input
+      const errors = await this._validateInput(actionDef, ctx);
+      if (errors.length !== 0) {
+        return { success: false, errors };
+      }
+
       // The action is allowed. Evaluate the action and create a list of
       // its effects.
       const effects: EffectResult[] = [];

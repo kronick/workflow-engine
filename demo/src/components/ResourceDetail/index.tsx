@@ -235,14 +235,17 @@ const ActionDetail: React.SFC<{
           {props.action.action}
         </button>{" "}
       </td>
-      {disabled && (
-        <td className={styles.propertyValue}>
+
+      <td className={styles.propertyValue}>
+        {disabled ? (
           <div>
             {disabledIcon}{" "}
             <span className={styles.actionReason}>{disabledReason}</span>
           </div>
-        </td>
-      )}
+        ) : (
+          <div>{JSON.stringify(props.action.input)}</div>
+        )}
+      </td>
     </tr>
   );
 };

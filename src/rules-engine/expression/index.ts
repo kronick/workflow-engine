@@ -11,7 +11,8 @@ export interface ExpressionContext {
   /** Variables captured by the context's current lambda*/
   closures?: { [name: string]: any };
 
-  self?: { [property: string]: any } | null;
+  self?: Record<string, any> | null;
+  input?: Record<string, any> | null;
   user?: User;
   stack?: string[];
 
@@ -235,6 +236,13 @@ const operatorMap: OperatorMap = {
     if (!ctx.self) throw new ExpressionTypeError("self", null);
 
     return ctx.self[property];
+  },
+
+  /** This function accesses a value from the `input` object in the context. */
+  getInput: async (fieldNameExpression, ctx) => {
+    const fieldName = await $string(fieldNameExpression, ctx);
+    if (!ctx.input) throw new ExpressionTypeError("self", null);
+    return ctx.input[fieldName];
   },
 
   /** This function access an argument set in a lambda / defined function */

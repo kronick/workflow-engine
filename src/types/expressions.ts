@@ -40,7 +40,8 @@ export type NumberProducingExpression =
   | GetExpression<"number">
   | IfExpression
   | StringLengthExpression
-  | ArgExpression;
+  | ArgExpression
+  | GetInputExpression;
 
 export type BooleanProducingExpression =
   | boolean
@@ -62,14 +63,16 @@ export type BooleanProducingExpression =
   | IfExpression
   | ContainsExpression<any>
   | GetExpression
-  | ArgExpression;
+  | ArgExpression
+  | GetInputExpression;
 
 export type StringProducingExpression =
   | GetExpression
   | IfExpression
   | string
   | ArgExpression
-  | JoinStringsExpression;
+  | JoinStringsExpression
+  | GetInputExpression;
 
 /** An expression that produces an array of primitives */
 export type ArrayProducingExpression<
@@ -79,18 +82,21 @@ export type ArrayProducingExpression<
       | NumberProducingExpression[]
       | GetAllExpression<"number[]">
       | GetExpression<"number[]">
+      | GetInputExpression
       | ArgExpression)
   : T extends "string"
   ? (
       | StringProducingExpression[]
       | GetAllExpression<"string[]">
       | GetExpression<"string[]">
+      | GetInputExpression
       | ArgExpression)
   : T extends "boolean"
   ? (
       | BooleanProducingExpression[]
       | GetAllExpression<"boolean[]">
       | GetExpression<"boolean[]">
+      | GetInputExpression
       | ArgExpression)
   : never;
 
@@ -108,6 +114,13 @@ interface GetExpression<TResult extends ExpressionResultTypes = "string"> {
         asType?: TResult;
       }
     | string;
+}
+
+/** An expression that extracts a value from the "input" portion of the
+ *  context.
+ */
+interface GetInputExpression {
+  getInput: StringProducingExpression;
 }
 
 /** An expression that extracts a value from a resource object */
