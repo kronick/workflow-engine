@@ -192,6 +192,75 @@ export const simpleDefinition: SystemDefinition = {
       },
 
       actions: {
+        editDocument: {
+          from: ["authoring", "revising"],
+          permissions: [
+            {
+              roles: ["author"],
+              conditions: ["allow"]
+            },
+            { denyWithMessage: "Only authors can edit the document." }
+          ],
+
+          input: {
+            fields: {
+              title: {
+                type: "string"
+              },
+              text: {
+                type: "string"
+              }
+            }
+          },
+
+          effects: [
+            // TODO: This is clearly an unwieldy syntax that needs fixing...
+            {
+              effectIf: { exists: { property: "title", from: "input" } },
+              effects: [
+                { set: { property: "title", value: { getInput: "title" } } }
+              ]
+            },
+            {
+              effectIf: { exists: { property: "text", from: "input" } },
+              effects: [
+                { set: { property: "text", value: { getInput: "text" } } }
+              ]
+            }
+          ],
+          includeInHistory: true
+        },
+
+        editReviewerNotes: {
+          from: ["reviewing"],
+          permissions: [
+            {
+              roles: ["reviewer"],
+              conditions: ["allow"]
+            },
+            { denyWithMessage: "Only reviewers can edit the reviewer notes." }
+          ],
+
+          input: {
+            fields: {
+              reviewerNotes: {
+                type: "string",
+                required: true
+              }
+            }
+          },
+
+          effects: [
+            {
+              set: {
+                property: "reviewerNotes",
+                value: { getInput: "reviewerNotes" }
+              }
+            }
+          ],
+          includeInHistory: true
+        },
+
         archive: {
           from: ["authoring", "reviewing", "revising", "approved"],
           to: "archived",

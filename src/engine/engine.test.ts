@@ -1,11 +1,12 @@
 import { SystemDefinition, User } from "../types";
-import { FakeInMemoryDataLoader } from "../dataLoader/index";
+import { FakeInMemoryDataLoader, DataLoader } from "../dataLoader/index";
 import PGBusinessEngine, { DescribeActionsResult } from "./";
 import { MockEmailService, EmailService } from "../emailService/index";
 
 describe("Business engine", async () => {
   let engine: PGBusinessEngine,
     resource: { uid: string; type: string },
+    dataLoader: DataLoader,
     adminUser: User,
     regularUser: User,
     anonymousUser: User,
@@ -20,11 +21,12 @@ describe("Business engine", async () => {
     regularUser = system.regularUser;
     anonymousUser = system.anonymousUser;
     emailService = system.emailService;
+    dataLoader = system.dataLoader;
   });
 
   describe("Listing", () => {
     it("can list resource types", async () => {
-      expect(engine.listResourceTypes()).toEqual(["Switch"]);
+      expect(engine.listResourceTypes()).toEqual(["Switch", "Poll"]);
     });
 
     it("can list resources of a given type", async () => {
@@ -308,6 +310,106 @@ describe("Business engine", async () => {
     });
   });
 
+  describe("Action input", () => {
+    it("Accepts valid input", async () => {
+      const poll = (await dataLoader.list("Poll"))[0];
+      const originalResult = await engine.getResource({
+        ...poll,
+        asUser: regularUser
+      });
+
+      const result = await engine.performAction({
+        ...poll,
+        asUser: regularUser,
+        action: "vote",
+        input: { voteCount: 10 }
+      });
+      expect(result.success).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it("Performs update using input value", async () => {
+      const poll = (await dataLoader.list("Poll"))[0];
+      const originalResult = await engine.getResource({
+        ...poll,
+        asUser: regularUser
+      });
+
+      await engine.performAction({
+        ...poll,
+        asUser: regularUser,
+        action: "vote",
+        input: { voteCount: 10 }
+      });
+
+      const newResult = await engine.getResource({
+        ...poll,
+        asUser: regularUser
+      });
+
+      expect(newResult.resource!["votes"].value).toBe(
+        (originalResult.resource!["votes"].value as number) + 10
+      );
+    });
+
+    it("Rejects input that doesn't pass validation", async () => {
+      const poll = (await dataLoader.list("Poll"))[0];
+      const originalResult = await engine.getResource({
+        ...poll,
+        asUser: regularUser
+      });
+
+      const result = await engine.performAction({
+        ...poll,
+        asUser: regularUser,
+        action: "vote",
+        input: { voteCount: 10000 }
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toEqual(
+        "You cannot add more than 100 votes at a time."
+      );
+
+      const newResult = await engine.getResource({
+        ...poll,
+        asUser: regularUser
+      });
+
+      // Value should not have changed
+      expect(newResult.resource!["votes"].value).toBe(
+        originalResult.resource!["votes"].value
+      );
+    });
+  });
+
+  it("Rejects input with missing required fields", async () => {
+    const poll = (await dataLoader.list("Poll"))[0];
+    const originalResult = await engine.getResource({
+      ...poll,
+      asUser: regularUser
+    });
+
+    const result = await engine.performAction({
+      ...poll,
+      asUser: regularUser,
+      action: "vote",
+      input: {}
+    });
+
+    expect(result.errors[0]).toEqual("Field 'voteCount' is required.");
+
+    const newResult = await engine.getResource({
+      ...poll,
+      asUser: regularUser
+    });
+
+    // Value should not have changed
+    expect(newResult.resource!["votes"].value).toBe(
+      originalResult.resource!["votes"].value
+    );
+  });
+
   describe("History log", () => {
     it("logs history event for actions", async () => {
       await engine.performAction({
@@ -323,7 +425,7 @@ describe("Business engine", async () => {
       });
 
       expect(log.history!.length).toBe(1);
-      expect(log.history![0].changes.length).toBe(1);
+      expect(log.history![0].changes.length).toBe(2);
     });
   });
 });
@@ -334,6 +436,7 @@ const simpleSystem: SystemDefinition = {
   name: "Simple system",
   roles: ["regular", "admin", "anonymous"],
   resources: {
+    /** Switch resource is used to test permissions and action state transitions */
     Switch: {
       states: ["off", "on", "turbo", "impossible"],
       readPermissions: [{ roles: ["regular", "admin"], conditions: ["allow"] }],
@@ -429,39 +532,55 @@ const simpleSystem: SystemDefinition = {
           conditions: [{ allowIf: { "=": [{ get: "secret" }, 0] } }]
         }
       }
+    },
+
+    /** Poll is used to test action inputs */
+    Poll: {
+      states: ["open", "closed"],
+      defaultState: "open",
+      properties: {
+        votes: {
+          type: "number"
+        }
+      },
+      actions: {
+        vote: {
+          from: ["open"],
+          input: {
+            fields: {
+              voteCount: {
+                type: "number",
+                required: true,
+                validation: [
+                  {
+                    allowIf: {
+                      "<": [{ getInput: "voteCount" }, 100]
+                    }
+                  },
+                  {
+                    denyWithMessage:
+                      "You cannot add more than 100 votes at a time."
+                  }
+                ]
+              }
+            }
+          },
+          permissions: ["allow"],
+          effects: [
+            {
+              set: {
+                property: "votes",
+                value: {
+                  "+": [{ getInput: "voteCount" }, { get: "votes" }]
+                }
+              }
+            }
+          ]
+        }
+      }
     }
   }
 };
-
-// const twoResourceSystem: SystemDefinition = {
-//   name: "Two Resource System",
-//   roles: ["regular", "admin", "anonymous"],
-//   resources: {
-//     Question: {
-//       states: ["open", "answered", "abandoned"],
-//       properties: {
-//         text: {
-//           type: "string"
-//         },
-//         answers: {
-//           type: {
-//             referenceTo: "Answer",
-//             constraints: ["CanHoldMany"]
-//           }
-//         }
-//       },
-//       actions: {
-//         provideAnswer: {
-//           from: ["open"],
-//           to: "answered"
-//         }
-//       }
-//     },
-//     Answer: {
-
-//     }
-//   }
-// };
 
 /** Test helper that will create a system with asingle `Switch` resource */
 async function createSimpleSystem(n: number = 1) {
@@ -497,6 +616,7 @@ async function createSimpleSystem(n: number = 1) {
     resource: resource[0],
     adminUser,
     regularUser,
-    anonymousUser
+    anonymousUser,
+    dataLoader
   };
 }

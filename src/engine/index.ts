@@ -2,9 +2,16 @@ import { SystemDefinition, User } from "../types/";
 import { DataLoader, UnknownResourceData, HistoryEvent } from "../dataLoader";
 import evaluateConditions from "../rules-engine/conditions";
 import evaluatePermissions from "../rules-engine/permissions";
-import evaluateExpression, { $boolean } from "../rules-engine/expression";
+import evaluateExpression, {
+  $boolean,
+  ExpressionContext
+} from "../rules-engine/expression";
 import { ConditionResult } from "../rules-engine/conditions/index";
-import { ActionDefinition, ResourceDefinition } from "../types/resources";
+import {
+  ActionDefinition,
+  ResourceDefinition,
+  InputDefinition
+} from "../types/resources";
 import { stdlibCtx } from "../rules-engine/expression/stdlib";
 import evaluateEffects, { EffectResult, UpdateEffectResult } from "../effects";
 import { EmailService } from "../emailService";
@@ -91,6 +98,8 @@ export type DescribeActionsResult = Array<{
   /** Target state */
   action: string;
 
+  input?: InputDefinition;
+
   /** Whether or not this action is possible given its current state*/
   possible: boolean;
 
@@ -115,7 +124,7 @@ export interface PerformActionParams {
   type: string;
   action: string;
   asUser: User;
-  input?: unknown;
+  input?: Record<string, unknown>;
 }
 
 export type PerformActionResult = Result<boolean, "success">;
@@ -126,8 +135,6 @@ interface BusinessEngine {
    */
   getResource(params: GetResourceParams): Promise<GetResourceResult>;
 
-  /** Update data for a resource. */
-  updateResource(params: UpdateResourceParams): Promise<GetResourceResult>;
   // TODO: Other CRUD methods
   // createResource(params: CreateResourceParams): Promise<UnknownResource>;
   // deleteResource(params: DeleteResourceParams): Promise<UnknownResource>;
@@ -363,24 +370,6 @@ export default class PGBusinessEngine implements BusinessEngine {
     return out;
   }
 
-  async updateResource({ uid, type, asUser, data }: UpdateResourceParams) {
-    // TODO: Validate data against system definition before attempting update
-    const success = await this.dataLoader.update(uid, type, data);
-
-    // Read the result back
-    // TODO: Derive calculated fields and omit fields the user does not
-    //  have permission to read
-    const rawResult = await this._getRawResource({ uid, type, asUser });
-
-    if (!rawResult) {
-      return RESOURCE_NOT_FOUND;
-    }
-
-    // TODO: Don't re-fetch after update. Although if the data loader caches
-    //  data this shouldn't make a difference.
-    return await this.getResource({ uid, type, asUser });
-  }
-
   async describeActions({
     uid,
     type,
@@ -409,6 +398,7 @@ export default class PGBusinessEngine implements BusinessEngine {
 
         result.push({
           action: t,
+          input: allActions[t].input,
           possible: possible.decision === "allow",
           possibleReason: possible.reason,
           allowed: allowed.decision === "allow",
@@ -483,6 +473,68 @@ export default class PGBusinessEngine implements BusinessEngine {
     return allowed.decision === "allow";
   }
 
+  // TODO: This should probably be refactored out into its own module
+  async _validateInput(
+    actionDefinition: ActionDefinition,
+    ctx: ExpressionContext
+  ): Promise<string[]> {
+    // Don't validate if there is no input definition on this action
+    if (!actionDefinition.input) return [];
+
+    // We can collect more than one error while validating input, so store
+    // output as an array.
+    const errors = [];
+
+    // Validate each field in the input definition
+    for (let field in actionDefinition.input.fields) {
+      try {
+        const fieldDef = actionDefinition.input.fields[field];
+
+        // Check that fields marked as required are included in the input
+        if (
+          fieldDef.required &&
+          (!ctx.input || ctx.input[field] === undefined)
+        ) {
+          errors.push(`Field '${field}' is required.`);
+          continue;
+        }
+
+        // Use the condition evaluator to decide if this field passes validation
+        const possible: ConditionResult = !fieldDef.validation
+          ? { decision: "allow" }
+          : await evaluateConditions(fieldDef.validation, ctx);
+
+        if (possible.decision === "deny") {
+          errors.push(
+            possible.reason || `Field '${field}' did not pass validation.`
+          );
+        }
+      } catch (e) {
+        errors.push(e);
+        console.error(e, ctx);
+      }
+    }
+
+    if (actionDefinition.input.validation) {
+      try {
+        const validationResult = await evaluateConditions(
+          actionDefinition.input.validation,
+          ctx
+        );
+        if (validationResult.decision === "deny") {
+          errors.push(
+            validationResult.reason || "Input did not pass validation."
+          );
+        }
+      } catch (e) {
+        errors.push(e);
+        console.error(e, ctx);
+      }
+    }
+
+    return errors;
+  }
+
   async performAction({
     uid,
     type,
@@ -507,7 +559,9 @@ export default class PGBusinessEngine implements BusinessEngine {
       return { success: false, errors: [`Resource not found.`] };
     }
 
-    const ctx = stdlibCtx({ self: { ...rawResult, uid, type } });
+    // Build a context with all the standard library methods, the current raw
+    // resource, and the input values
+    const ctx = stdlibCtx({ self: { ...rawResult, uid, type }, input });
 
     const { allowed } = await this._evaluateActionPermissions(
       actionDef,
@@ -516,6 +570,12 @@ export default class PGBusinessEngine implements BusinessEngine {
     );
 
     if (allowed.decision === "allow") {
+      // Validate input
+      const errors = await this._validateInput(actionDef, ctx);
+      if (errors.length !== 0) {
+        return { success: false, errors };
+      }
+
       // The action is allowed. Evaluate the action and create a list of
       // its effects.
       const effects: EffectResult[] = [];
@@ -546,7 +606,12 @@ export default class PGBusinessEngine implements BusinessEngine {
 
       // Now that all effects have been evaluated, execute them
       // TODO: Error handling and reporting
-      await this._performEffects(effects, { uid, type }, includeInHistory);
+      await this._performEffects(
+        action,
+        effects,
+        { uid, type },
+        includeInHistory
+      );
 
       return { success: true, errors: [] };
     } else {
@@ -558,6 +623,7 @@ export default class PGBusinessEngine implements BusinessEngine {
    *  dataLoader, sending e-mails, and logging history events.
    */
   async _performEffects(
+    actionName: string,
     effects: EffectResult[],
     parent: { uid: string; type: string },
     writeHistory: boolean
@@ -582,8 +648,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       // Merge all updated properties on each updated object
       const updated: Map<string, { [key: string]: unknown }> = new Map();
       effects
-        // Only include effects that are marked to include in history
-        .filter(e => e.type === "update" && e.includeInHistory)
+        .filter(e => e.type === "update")
         .map(e => e as UpdateEffectResult)
         .forEach(e => {
           const k = makeKey(e.on.uid, e.on.type);
@@ -591,6 +656,7 @@ export default class PGBusinessEngine implements BusinessEngine {
         });
 
       const event: HistoryEvent = {
+        action: actionName,
         timestamp: new Date().getTime(),
         parentResource: parent,
         changes: Array.from(updated.entries())

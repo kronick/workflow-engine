@@ -11,7 +11,7 @@
 
 .propertyTable td {
   padding: 0.25em;
-  vertical-align: middle;
+  vertical-align: top;
 }
 
 .propertyName {
@@ -48,9 +48,7 @@
 
 .actionName {
   text-align: right;
-}
-.actionRow {
-  text-align: center;
+  font-size: 16pt;
 }
 
 .actionButton {
