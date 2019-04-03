@@ -135,8 +135,6 @@ interface BusinessEngine {
    */
   getResource(params: GetResourceParams): Promise<GetResourceResult>;
 
-  /** Update data for a resource. */
-  updateResource(params: UpdateResourceParams): Promise<GetResourceResult>;
   // TODO: Other CRUD methods
   // createResource(params: CreateResourceParams): Promise<UnknownResource>;
   // deleteResource(params: DeleteResourceParams): Promise<UnknownResource>;
@@ -370,24 +368,6 @@ export default class PGBusinessEngine implements BusinessEngine {
     }
 
     return out;
-  }
-
-  async updateResource({ uid, type, asUser, data }: UpdateResourceParams) {
-    // TODO: Validate data against system definition before attempting update
-    const success = await this.dataLoader.update(uid, type, data);
-
-    // Read the result back
-    // TODO: Derive calculated fields and omit fields the user does not
-    //  have permission to read
-    const rawResult = await this._getRawResource({ uid, type, asUser });
-
-    if (!rawResult) {
-      return RESOURCE_NOT_FOUND;
-    }
-
-    // TODO: Don't re-fetch after update. Although if the data loader caches
-    //  data this shouldn't make a difference.
-    return await this.getResource({ uid, type, asUser });
   }
 
   async describeActions({
