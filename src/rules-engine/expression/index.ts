@@ -156,10 +156,20 @@ const operatorMap: OperatorMap = {
     (await $string(A, ctx)) === (await $string(B, ctx)),
 
   exists: async ({ property, from }, ctx) => {
-    if (from) throw new NotImplemented("exists from");
+    const propertyString = await $string(property, ctx);
+
+    if (from) {
+      if (from === "input") {
+        if (!ctx.input) return false;
+        return ctx.input[propertyString] !== undefined;
+      } else {
+        throw new NotImplemented("exists from");
+      }
+    }
+
     if (!ctx.self) throw new ExpressionTypeError("self", null);
 
-    return ctx.self[property] !== undefined;
+    return ctx.self[propertyString] !== undefined;
   },
 
   stringLength: async (string, ctx) => {

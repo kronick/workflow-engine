@@ -425,7 +425,7 @@ describe("Business engine", async () => {
       });
 
       expect(log.history!.length).toBe(1);
-      expect(log.history![0].changes.length).toBe(1);
+      expect(log.history![0].changes.length).toBe(2);
     });
   });
 });

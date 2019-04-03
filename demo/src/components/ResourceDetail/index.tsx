@@ -7,6 +7,7 @@ import HistoryLog from "../HistoryLog";
 
 import styles from "./ResourceDetail.module.css";
 import { HistoryEvent } from "pg-workflow-engine/dist/dataLoader/index";
+import InputForm from "../InputForm";
 
 interface ResourceDetailProps {
   resource?: ResourceData | null;
@@ -61,13 +62,14 @@ export default class ResourceDetail extends React.Component<
     this.setState({ actions: result });
   };
 
-  handleAction = async (action: string) => {
+  handleAction = async (action: string, input?: Record<string, unknown>) => {
     if (this.props.resource && this.props.user) {
       const result = await this.props.engine.performAction({
         uid: this.props.resource.uid,
         type: this.props.resource.type,
         asUser: this.props.user,
-        action
+        action,
+        input
       });
 
       if (!result.success) {
@@ -205,7 +207,7 @@ const PropertyEditor: React.SFC<{
 
 const ActionDetail: React.SFC<{
   action: DescribeActionsResult[0];
-  onAction: (actionName: string, data: unknown | null) => void;
+  onAction: (actionName: string, input?: Record<string, unknown>) => void;
 }> = props => {
   let disabled = false;
   let disabledReason = "";
@@ -225,15 +227,19 @@ const ActionDetail: React.SFC<{
   return (
     <tr>
       <td className={styles.actionName}>
-        <button
-          onClick={() => props.onAction(props.action.action, null)}
-          className={[
-            styles.actionButton,
-            disabled ? styles.disabled : undefined
-          ].join(" ")}
-        >
-          {props.action.action}
-        </button>{" "}
+        {props.action.input ? (
+          props.action.action
+        ) : (
+          <button
+            onClick={() => props.onAction(props.action.action)}
+            className={[
+              styles.actionButton,
+              disabled ? styles.disabled : undefined
+            ].join(" ")}
+          >
+            {props.action.action}
+          </button>
+        )}
       </td>
 
       <td className={styles.propertyValue}>
@@ -243,7 +249,14 @@ const ActionDetail: React.SFC<{
             <span className={styles.actionReason}>{disabledReason}</span>
           </div>
         ) : (
-          <div>{JSON.stringify(props.action.input)}</div>
+          props.action.input && (
+            <div>
+              <InputForm
+                inputDefinition={props.action.input}
+                onSubmit={data => props.onAction(props.action.action, data)}
+              />
+            </div>
+          )
         )}
       </td>
     </tr>

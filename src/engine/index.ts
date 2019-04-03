@@ -511,7 +511,10 @@ export default class PGBusinessEngine implements BusinessEngine {
         const fieldDef = actionDefinition.input.fields[field];
 
         // Check that fields marked as required are included in the input
-        if (fieldDef.required && (!ctx.input || !ctx.input[field])) {
+        if (
+          fieldDef.required &&
+          (!ctx.input || ctx.input[field] === undefined)
+        ) {
           errors.push(`Field '${field}' is required.`);
           continue;
         }
@@ -623,7 +626,12 @@ export default class PGBusinessEngine implements BusinessEngine {
 
       // Now that all effects have been evaluated, execute them
       // TODO: Error handling and reporting
-      await this._performEffects(effects, { uid, type }, includeInHistory);
+      await this._performEffects(
+        action,
+        effects,
+        { uid, type },
+        includeInHistory
+      );
 
       return { success: true, errors: [] };
     } else {
@@ -635,6 +643,7 @@ export default class PGBusinessEngine implements BusinessEngine {
    *  dataLoader, sending e-mails, and logging history events.
    */
   async _performEffects(
+    actionName: string,
     effects: EffectResult[],
     parent: { uid: string; type: string },
     writeHistory: boolean
@@ -659,8 +668,7 @@ export default class PGBusinessEngine implements BusinessEngine {
       // Merge all updated properties on each updated object
       const updated: Map<string, { [key: string]: unknown }> = new Map();
       effects
-        // Only include effects that are marked to include in history
-        .filter(e => e.type === "update" && e.includeInHistory)
+        .filter(e => e.type === "update")
         .map(e => e as UpdateEffectResult)
         .forEach(e => {
           const k = makeKey(e.on.uid, e.on.type);
@@ -668,6 +676,7 @@ export default class PGBusinessEngine implements BusinessEngine {
         });
 
       const event: HistoryEvent = {
+        action: actionName,
         timestamp: new Date().getTime(),
         parentResource: parent,
         changes: Array.from(updated.entries())

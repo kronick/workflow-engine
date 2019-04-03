@@ -102,7 +102,8 @@ export type ArrayProducingExpression<
 
 export type ResourceProducingExpression =
   | DereferenceExpression
-  | MostRecentExpression;
+  | MostRecentExpression
+  | "input";
 
 /** An expression that extracts a value from a single resource object */
 interface GetExpression<TResult extends ExpressionResultTypes = "string"> {

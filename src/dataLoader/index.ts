@@ -21,6 +21,7 @@ interface ListPropertyChange {
 }
 
 export interface HistoryEvent {
+  action?: string;
   timestamp: number;
   changes: Change[];
   parentResource: { uid: string; type: string };
